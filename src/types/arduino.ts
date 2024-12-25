@@ -82,33 +82,23 @@ export const PropertyUnits: Partial<Record<PropertyName, string>> = {
 };
 
 // Default values for properties
+export const DefaultValues: Record<PropertyName, any> = {
+  alertEmail: '',
+  cloudflowrate: 0,
+  cloudhumidity: 0,
+  cloudtemp: 0,
+  flowThresholdMin: 5.0,
+  humidityThresholdMax: 70.0,
+  humidityThresholdMin: 30.0,
+  lastUpdateTime: new Date().toISOString(),
+  noFlowCriticalTime: 3,
+  noFlowWarningTime: 2,
+  tempThresholdMax: 35.0,
+  tempThresholdMin: 5.0
+};
+
 export function getDefaultValue(propertyName: PropertyName): any {
-  switch (propertyName) {
-    case 'alertEmail':
-      return '';
-    case 'cloudflowrate':
-    case 'cloudhumidity':
-    case 'cloudtemp':
-      return 0;
-    case 'flowThresholdMin':
-      return 5.0;
-    case 'humidityThresholdMax':
-      return 70.0;
-    case 'humidityThresholdMin':
-      return 30.0;
-    case 'lastUpdateTime':
-      return new Date().toISOString();
-    case 'noFlowCriticalTime':
-      return 3;
-    case 'noFlowWarningTime':
-      return 2;
-    case 'tempThresholdMax':
-      return 35.0;
-    case 'tempThresholdMin':
-      return 5.0;
-    default:
-      return null;
-  }
+  return DefaultValues[propertyName];
 }
 
 // Helper functions

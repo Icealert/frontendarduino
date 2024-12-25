@@ -1,4 +1,4 @@
-import { ArduinoDevice, ArduinoProperty, DeviceSettings, validateValue, getDefaultValue } from '@/types/arduino';
+import { ArduinoDevice, ArduinoProperty, DeviceSettings, validateValue, DefaultValues } from '@/types/arduino';
 
 export interface ArduinoApiClient {
   getDevices(): Promise<ArduinoDevice[]>;
@@ -56,17 +56,16 @@ export async function createArduinoApiClient(): Promise<ArduinoApiClient> {
       const properties = await this.getDeviceProperties(deviceId);
       const settings: Partial<DeviceSettings> = {};
 
-      properties.forEach((prop: ArduinoProperty) => {
-        const name = prop.name as keyof DeviceSettings;
-        if (name) {
-          settings[name] = prop.value;
-        }
+      // First, set all properties to their default values
+      (Object.keys(DefaultValues) as Array<keyof DeviceSettings>).forEach(key => {
+        settings[key] = DefaultValues[key];
       });
 
-      // Fill in any missing properties with default values
-      (Object.keys(getDefaultValue('alertEmail')) as Array<keyof DeviceSettings>).forEach(propName => {
-        if (settings[propName] === undefined) {
-          settings[propName] = getDefaultValue(propName as any);
+      // Then override with actual values from the device
+      properties.forEach((prop: ArduinoProperty) => {
+        const name = prop.name as keyof DeviceSettings;
+        if (name && name in DefaultValues) {
+          settings[name] = prop.value;
         }
       });
 
