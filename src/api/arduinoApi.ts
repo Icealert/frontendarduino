@@ -5,6 +5,7 @@ export interface ArduinoApiClient {
   getDeviceProperties(deviceId: string): Promise<ArduinoProperty[]>;
   updateProperty(deviceId: string, propertyId: string, value: any): Promise<void>;
   getDeviceSettings(deviceId: string): Promise<DeviceSettings>;
+  updateDeviceSettings(deviceId: string, settings: Partial<DeviceSettings>): Promise<void>;
 }
 
 export async function createArduinoApiClient(clientId: string, clientSecret: string): Promise<ArduinoApiClient> {
@@ -89,6 +90,19 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
         tempThresholdMax: settings.tempThresholdMax || 30,
         tempThresholdMin: settings.tempThresholdMin || 10
       };
+    },
+
+    async updateDeviceSettings(deviceId: string, settings: Partial<DeviceSettings>) {
+      // Get current properties to map settings to property IDs
+      const properties = await this.getDeviceProperties(deviceId);
+      
+      // Update each setting
+      for (const [key, value] of Object.entries(settings)) {
+        const property = properties.find(p => p.name === key);
+        if (property) {
+          await this.updateProperty(deviceId, property.id, value);
+        }
+      }
     },
 
     async updateProperty(deviceId: string, propertyId: string, value: any) {
