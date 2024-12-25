@@ -57,24 +57,34 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     },
 
     async getDeviceSettings(deviceId: string): Promise<DeviceSettings> {
-      const response = await fetch(`https://api2.arduino.cc/iot/v2/devices/${deviceId}`, {
-        headers: {
-          'Authorization': `Bearer ${access_token}`
+      const properties = await this.getDeviceProperties(deviceId);
+      const settings: Partial<DeviceSettings> = {};
+
+      // Map each property to its corresponding setting
+      properties.forEach(prop => {
+        const key = prop.name as keyof DeviceSettings;
+        if (key in settings) {
+          settings[key] = prop.value;
         }
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to get device settings: ${response.statusText}`);
-      }
-
-      const device = await response.json();
-      return {
-        name: device.name,
-        timezone: device.timezone || '',
-        template: device.template || '',
-        serial: device.serial || '',
-        type: device.type || ''
+      // Ensure all required properties are present with default values
+      const defaultSettings: DeviceSettings = {
+        alertEmail: settings.alertEmail || '',
+        cloudflowrate: settings.cloudflowrate || 0,
+        cloudhumidity: settings.cloudhumidity || 0,
+        cloudtemp: settings.cloudtemp || 0,
+        flowThresholdMin: settings.flowThresholdMin || 5,
+        humidityThresholdMax: settings.humidityThresholdMax || 80,
+        humidityThresholdMin: settings.humidityThresholdMin || 20,
+        lastUpdateTime: settings.lastUpdateTime || new Date().toISOString(),
+        noFlowCriticalTime: settings.noFlowCriticalTime || 5,
+        noFlowWarningTime: settings.noFlowWarningTime || 3,
+        tempThresholdMax: settings.tempThresholdMax || 30,
+        tempThresholdMin: settings.tempThresholdMin || 10
       };
+
+      return defaultSettings;
     },
 
     async updateProperty(deviceId: string, propertyId: string, value: any): Promise<void> {

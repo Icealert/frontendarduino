@@ -1,16 +1,23 @@
-export interface ArduinoProperty {
-  id: string;
-  name: string;
-  value: any;
-  type: string;
-  timestamp?: string;
-}
-
 export interface ArduinoDevice {
   id: string;
   name: string;
-  status: 'ONLINE' | 'OFFLINE';
+  type?: string;
+  serial?: string;
+  fqbn?: string;
+  events?: any[];
   properties?: ArduinoProperty[];
+}
+
+export interface ArduinoProperty {
+  id: string;
+  name: string;
+  type: string;
+  value: any;
+  persist: boolean;
+  update_strategy: string;
+  update_parameter: number;
+  permission: string;
+  variable_name: string;
 }
 
 export interface DeviceSettings {
