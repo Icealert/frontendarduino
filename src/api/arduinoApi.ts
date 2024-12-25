@@ -26,13 +26,16 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
       : 'http://localhost:3000';
 
-  // Create token request body
-  const tokenBody = new URLSearchParams({
-    grant_type: 'client_credentials',
-    client_id: clientId,
-    client_secret: clientSecret,
-    audience: 'https://api2.arduino.cc/iot'
-  }).toString();
+  console.log('Creating Arduino API client with base URL:', baseUrl);
+
+  // Create token request body exactly as per Arduino docs
+  const requestBody = new URLSearchParams();
+  requestBody.append('grant_type', 'client_credentials');
+  requestBody.append('client_id', clientId);
+  requestBody.append('client_secret', clientSecret);
+  requestBody.append('audience', 'https://api2.arduino.cc/iot');
+
+  console.log('Making token request to:', `${baseUrl}/api/arduino/token`);
 
   // Get access token from our token endpoint using absolute URL
   const tokenResponse = await fetch(`${baseUrl}/api/arduino/token`, {
@@ -40,13 +43,20 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded'
     },
-    body: tokenBody
+    body: requestBody.toString()
+  });
+
+  const responseText = await tokenResponse.text();
+  console.log('Token response:', {
+    status: tokenResponse.status,
+    statusText: tokenResponse.statusText,
+    body: responseText
   });
 
   if (!tokenResponse.ok) {
     let errorMessage = 'Failed to obtain access token';
     try {
-      const errorData = await tokenResponse.json();
+      const errorData = JSON.parse(responseText);
       errorMessage = errorData.error || errorMessage;
     } catch {
       errorMessage = tokenResponse.statusText;
@@ -56,7 +66,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
 
   let tokenData: TokenResponse;
   try {
-    tokenData = await tokenResponse.json();
+    tokenData = JSON.parse(responseText);
   } catch (error) {
     console.error('Failed to parse token response:', error);
     throw new Error('Failed to parse token response');
@@ -66,10 +76,13 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     throw new Error('No access token received from Arduino IoT Cloud');
   }
 
+  console.log('Successfully obtained access token');
+
   const access_token = tokenData.access_token;
 
   const makeRequest = async (endpoint: string, options: RequestInit = {}) => {
     const url = `${baseUrl}/api/arduino/proxy?endpoint=${encodeURIComponent(endpoint)}`;
+    console.log('Making API request to:', url);
 
     const response = await fetch(url, {
       ...options,
@@ -81,10 +94,17 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       }
     });
 
+    const responseText = await response.text();
+    console.log('API response:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText
+    });
+
     if (!response.ok) {
       let errorMessage = 'API request failed';
       try {
-        const errorData = await response.json();
+        const errorData = JSON.parse(responseText);
         errorMessage = errorData.error || errorMessage;
       } catch {
         errorMessage = response.statusText;
@@ -92,7 +112,12 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       throw new Error(errorMessage);
     }
 
-    return response.json();
+    try {
+      return JSON.parse(responseText);
+    } catch (error) {
+      console.error('Failed to parse API response:', error);
+      throw new Error('Failed to parse API response');
+    }
   };
 
   const client: ArduinoApiClient = {

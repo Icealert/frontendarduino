@@ -14,63 +14,79 @@ export async function POST(request: NextRequest) {
   try {
     // Get request body as text and parse it
     const body = await request.text();
+    console.log('Raw request body:', body);
+
     const params = new URLSearchParams(body);
     
-    const clientId = params.get('client_id');
-    const clientSecret = params.get('client_secret');
-    const grantType = params.get('grant_type');
-    const audience = params.get('audience');
+    // Get credentials from environment if not in request
+    const clientId = params.get('client_id') || process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID;
+    const clientSecret = params.get('client_secret') || process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET;
+    const grantType = params.get('grant_type') || 'client_credentials';
+    const audience = params.get('audience') || 'https://api2.arduino.cc/iot';
 
     // Log request details for debugging
-    console.log('Token request received:', {
+    console.log('Token request parameters:', {
       clientId: clientId ? '[REDACTED]' : undefined,
       clientSecret: clientSecret ? '[REDACTED]' : undefined,
       grantType,
-      audience
+      audience,
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret
     });
 
     // Validate required fields
-    if (!clientId || !clientSecret || !grantType || !audience) {
-      console.error('Missing required fields:', { clientId: !!clientId, clientSecret: !!clientSecret, grantType, audience });
+    if (!clientId || !clientSecret) {
+      console.error('Missing credentials:', { 
+        hasClientId: !!clientId, 
+        hasClientSecret: !!clientSecret,
+        envClientId: !!process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID,
+        envClientSecret: !!process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET
+      });
       return NextResponse.json(
-        { error: 'Missing required fields: client_id, client_secret, grant_type, and audience are required' },
+        { error: 'Missing credentials: client_id and client_secret are required' },
         { status: 400, headers: corsHeaders }
       );
     }
+
+    // Prepare request body exactly as per Arduino docs
+    const requestBody = new URLSearchParams();
+    requestBody.append('grant_type', grantType);
+    requestBody.append('client_id', clientId);
+    requestBody.append('client_secret', clientSecret);
+    requestBody.append('audience', audience);
+
+    console.log('Making request to Arduino API:', {
+      url: `${ARDUINO_API_BASE}/v1/clients/token`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
 
     // Make request to Arduino IoT Cloud API
     const response = await fetch(`${ARDUINO_API_BASE}/v1/clients/token`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json'
+        'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: new URLSearchParams({
-        grant_type: grantType,
-        client_id: clientId,
-        client_secret: clientSecret,
-        audience: audience
-      }).toString()
+      body: requestBody.toString()
+    });
+
+    const responseText = await response.text();
+    console.log('Arduino API response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: responseText
     });
 
     let responseData;
     try {
-      const responseText = await response.text();
-      console.log('Arduino API raw response:', responseText);
-      
-      try {
-        responseData = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('Failed to parse response as JSON:', parseError);
-        return NextResponse.json(
-          { error: 'Invalid JSON response from Arduino IoT Cloud' },
-          { status: 500, headers: corsHeaders }
-        );
-      }
-    } catch (error) {
-      console.error('Failed to read Arduino API response:', error);
+      responseData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse response as JSON:', parseError);
       return NextResponse.json(
-        { error: 'Failed to read response from Arduino IoT Cloud' },
+        { error: 'Invalid JSON response from Arduino IoT Cloud' },
         { status: 500, headers: corsHeaders }
       );
     }
@@ -94,6 +110,8 @@ export async function POST(request: NextRequest) {
         { status: 500, headers: corsHeaders }
       );
     }
+
+    console.log('Successfully obtained token');
 
     // Return the token response with CORS headers
     return NextResponse.json(responseData, {
