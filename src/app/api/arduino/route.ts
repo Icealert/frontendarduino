@@ -7,40 +7,40 @@ export async function GET() {
     const clientSecret = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
+      console.error('Missing Arduino credentials');
       return NextResponse.json(
         { error: 'Missing Arduino IoT Cloud credentials' },
         { status: 401 }
       );
     }
 
+    console.log('Attempting to create Arduino client...');
     const client = await createArduinoApiClient(clientId, clientSecret);
+    
+    console.log('Fetching devices...');
     const devices = await client.getDevices();
-
-    return new NextResponse(JSON.stringify(devices), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      },
-    });
+    
+    console.log(`Successfully fetched ${devices.length} devices`);
+    return NextResponse.json({ devices });
   } catch (error: any) {
-    console.error('Arduino API Error:', error);
+    console.error('Arduino API error:', error);
+    
+    // Handle specific error cases
+    if (error.message?.includes('Failed to obtain access token')) {
+      return NextResponse.json(
+        { error: 'Authentication failed. Please check your credentials.' },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch devices' },
-      { 
-        status: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        }
-      }
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
     );
   }
 }
 
+// Handle CORS preflight requests
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,

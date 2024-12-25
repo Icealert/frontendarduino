@@ -10,42 +10,55 @@ export interface ArduinoApiClient {
 
 export async function createArduinoApiClient(clientId: string, clientSecret: string) {
   const makeRequest = async (path: string, options: RequestInit = {}) => {
-    // Get access token
-    const tokenResponse = await fetch('https://api2.arduino.cc/iot/v1/clients/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: clientId,
-        client_secret: clientSecret,
-        audience: 'https://api2.arduino.cc/iot',
-      }),
-    });
+    try {
+      console.log('Requesting access token...');
+      // Get access token
+      const tokenResponse = await fetch('https://api2.arduino.cc/iot/v1/clients/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: clientId,
+          client_secret: clientSecret,
+          audience: 'https://api2.arduino.cc/iot',
+        }),
+      });
 
-    if (!tokenResponse.ok) {
-      throw new Error('Failed to obtain access token');
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Token response error:', errorData);
+        throw new Error(`Failed to obtain access token: ${errorData.error || tokenResponse.statusText}`);
+      }
+
+      const { access_token } = await tokenResponse.json();
+      console.log('Access token obtained successfully');
+
+      // Make the actual API request
+      console.log(`Making API request to ${path}...`);
+      const response = await fetch(`https://api2.arduino.cc/iot/v2/${path}`, {
+        ...options,
+        headers: {
+          ...options.headers,
+          'Authorization': `Bearer ${access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('API response error:', error);
+        throw new Error(error.message || `API request failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`API request to ${path} successful`);
+      return data;
+    } catch (error: any) {
+      console.error('Request error:', error);
+      throw error;
     }
-
-    const { access_token } = await tokenResponse.json();
-
-    // Make the actual API request
-    const response = await fetch(`https://api2.arduino.cc/iot/v2/${path}`, {
-      ...options,
-      headers: {
-        ...options.headers,
-        'Authorization': `Bearer ${access_token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(error.message || 'API request failed');
-    }
-
-    return response.json();
   };
 
   return {
