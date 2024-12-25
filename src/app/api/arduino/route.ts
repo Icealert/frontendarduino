@@ -15,7 +15,7 @@ export async function GET() {
     }
 
     console.log('Attempting to create Arduino client...');
-    const client = await createArduinoApiClient(clientId, clientSecret);
+    const client = await createArduinoApiClient();
     
     console.log('Fetching devices...');
     const devices = await client.getDevices();
