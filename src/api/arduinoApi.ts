@@ -19,18 +19,17 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     throw new Error('Client ID and Client Secret are required');
   }
 
-  // Get access token directly from Arduino API
+  // Create form data for token request
+  const formData = new FormData();
+  formData.append('grant_type', 'client_credentials');
+  formData.append('client_id', clientId);
+  formData.append('client_secret', clientSecret);
+  formData.append('audience', 'https://api2.arduino.cc/iot');
+
+  // Get access token from our token endpoint
   const tokenResponse = await fetch('/api/arduino/token', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: clientId,
-      client_secret: clientSecret,
-      audience: 'https://api2.arduino.cc/iot'
-    }).toString()
+    body: formData
   });
 
   if (!tokenResponse.ok) {
@@ -66,6 +65,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
         ...options.headers,
         'Authorization': `Bearer ${access_token}`,
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       }
     });
 
