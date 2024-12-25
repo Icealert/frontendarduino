@@ -29,6 +29,8 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
   const [expandedDevice, setExpandedDevice] = useState<string | null>(null);
   const [editableValues, setEditableValues] = useState<{[key: string]: any}>({});
   const [saving, setSaving] = useState<{[key: string]: boolean}>({});
+  const [deviceProperties, setDeviceProperties] = useState<{[key: string]: ArduinoProperty[]}>({});
+  const [loadingProperties, setLoadingProperties] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     fetchDevices();
@@ -51,6 +53,37 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
       console.error('Error fetching devices:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDeviceProperties = async (deviceId: string) => {
+    if (deviceProperties[deviceId]) return; // Already fetched
+
+    try {
+      setLoadingProperties(prev => ({ ...prev, [deviceId]: true }));
+      const response = await fetch(`/api/arduino/properties/${deviceId}`);
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      setDeviceProperties(prev => ({
+        ...prev,
+        [deviceId]: data.properties || []
+      }));
+    } catch (err) {
+      console.error('Failed to fetch device properties:', err);
+      // Show error in UI
+    } finally {
+      setLoadingProperties(prev => ({ ...prev, [deviceId]: false }));
+    }
+  };
+
+  const handleDeviceClick = async (deviceId: string) => {
+    setExpandedDevice(expandedDevice === deviceId ? null : deviceId);
+    if (deviceId !== expandedDevice) {
+      await fetchDeviceProperties(deviceId);
     }
   };
 
@@ -77,19 +110,12 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
       }
 
       // Update local state
-      setDevices(prevDevices => 
-        prevDevices.map(device => {
-          if (device.id === deviceId) {
-            return {
-              ...device,
-              properties: device.properties?.map(prop => 
-                prop.name === propertyName ? { ...prop, value } : prop
-              )
-            };
-          }
-          return device;
-        })
-      );
+      setDeviceProperties(prev => ({
+        ...prev,
+        [deviceId]: prev[deviceId]?.map(prop => 
+          prop.name === propertyName ? { ...prop, value } : prop
+        ) || []
+      }));
 
       setEditableValues(prev => ({ ...prev, [propertyName]: undefined }));
     } catch (err) {
@@ -133,7 +159,7 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
         >
           <div 
             className="p-4 bg-slate-700 flex items-center justify-between cursor-pointer"
-            onClick={() => setExpandedDevice(expandedDevice === device.id ? null : device.id)}
+            onClick={() => handleDeviceClick(device.id)}
           >
             <div>
               <h3 className="text-lg font-semibold text-slate-100">{device.name}</h3>
@@ -141,60 +167,72 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
                 {device.status}
               </p>
             </div>
-            <button
-              className="p-2 hover:bg-slate-600 rounded-full transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeviceSelect(device);
-              }}
-            >
-              <span className="sr-only">View details</span>
-              <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                className="p-2 hover:bg-slate-600 rounded-full transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeviceSelect(device);
+                }}
+              >
+                <span className="sr-only">View details</span>
+                <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
           </div>
 
-          {expandedDevice === device.id && device.properties && (
+          {expandedDevice === device.id && (
             <div className="p-4 space-y-6">
-              {groupProperties(device.properties).map(({ group, properties }: GroupedProperties) => (
-                <div key={group} className="space-y-2">
-                  <h4 className="text-sm font-medium text-slate-400 uppercase">{group}</h4>
-                  <div className="space-y-1">
-                    {properties.map(prop => (
-                      <div key={prop.name} className="flex items-center justify-between">
-                        <span className="text-slate-300">{prop.name}</span>
-                        {isEditable(prop.name) ? (
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type={getInputType(prop.name)}
-                              step={getStepValue(prop.name)}
-                              value={editableValues[prop.name] ?? prop.value}
-                              onChange={(e) => setEditableValues(prev => ({
-                                ...prev,
-                                [prop.name]: e.target.value
-                              }))}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handlePropertyChange(device.id, prop.name, editableValues[prop.name]);
-                                }
-                              }}
-                              className="bg-slate-700 text-slate-100 rounded px-2 py-1 w-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            {saving[prop.name] && (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className={getStatusColor(prop.name, prop.value)}>
-                            {formatValue(prop.name, prop.value)}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+              {loadingProperties[device.id] ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
                 </div>
-              ))}
+              ) : deviceProperties[device.id] ? (
+                groupProperties(deviceProperties[device.id]).map(({ group, properties }: GroupedProperties) => (
+                  <div key={group} className="space-y-2">
+                    <h4 className="text-sm font-medium text-slate-400 uppercase tracking-wider">{group}</h4>
+                    <div className="space-y-3 bg-slate-750 rounded-lg p-3">
+                      {properties.map(prop => (
+                        <div key={prop.name} className="flex items-center justify-between">
+                          <span className="text-slate-300 font-medium">{prop.name}</span>
+                          {isEditable(prop.name) ? (
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type={getInputType(prop.name)}
+                                step={getStepValue(prop.name)}
+                                value={editableValues[prop.name] ?? prop.value}
+                                onChange={(e) => setEditableValues(prev => ({
+                                  ...prev,
+                                  [prop.name]: e.target.value
+                                }))}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handlePropertyChange(device.id, prop.name, editableValues[prop.name]);
+                                  }
+                                }}
+                                className="bg-slate-700 text-slate-100 rounded px-2 py-1 w-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              {saving[prop.name] && (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className={`${getStatusColor(prop.name, prop.value)} font-medium`}>
+                              {formatValue(prop.name, prop.value)}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-slate-400 text-center py-4">
+                  No properties found
+                </div>
+              )}
             </div>
           )}
         </div>
