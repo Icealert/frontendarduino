@@ -1,180 +1,123 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { ArduinoDevice } from '@/types/arduino';
 import DeviceList from '@/components/DeviceList';
+import { createArduinoApiClient, ArduinoApiClient } from '@/api/arduinoApi';
 
 export default function Home() {
-  const [status, setStatus] = useState('Checking connection...');
+  const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [client, setClient] = useState<ArduinoApiClient | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<ArduinoDevice | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function checkConnection() {
+    async function initializeArduino() {
       try {
-        const response = await fetch('/api/test');
-        const data = await response.json();
+        const clientId = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID;
+        const clientSecret = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET;
 
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to connect to Arduino IoT Cloud');
+        if (!clientId || !clientSecret) {
+          setError('Missing Arduino IoT Cloud credentials');
+          setIsLoading(false);
+          return;
         }
 
-        setStatus(data.message || 'Successfully connected!');
-        setIsAuthenticated(true);
+        const arduinoClient = await createArduinoApiClient(clientId, clientSecret);
+        setClient(arduinoClient);
+        setIsConnected(true);
         setError(null);
       } catch (err: any) {
-        console.error('Connection error:', err);
-        setStatus('Connection failed');
-        setError(err.message);
-        setIsAuthenticated(false);
+        console.error('Failed to initialize Arduino client:', err);
+        setError(err.message || 'Failed to connect to Arduino IoT Cloud');
+        setIsConnected(false);
+      } finally {
+        setIsLoading(false);
       }
     }
 
-    checkConnection();
+    initializeArduino();
   }, []);
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-indigo-900 to-indigo-800">
-      {/* Header */}
-      <header className="bg-indigo-900/30 backdrop-blur-lg border-b border-indigo-500/20 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              {/* Logo/Icon */}
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-600/20 to-indigo-800/20 backdrop-blur-lg rounded-xl flex items-center justify-center shadow-lg border border-indigo-500/20 group hover:from-indigo-500/20 hover:to-indigo-700/20 transition-all duration-300">
-                <svg className="w-7 h-7 text-indigo-300 group-hover:text-indigo-200 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-indigo-100 tracking-tight">IceAlert Dashboard</h1>
-                <p className="text-indigo-300/90">Real-time Temperature Monitoring</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className={`flex items-center px-4 py-2 rounded-full text-sm font-medium shadow-lg transition-colors duration-300 ${
-                status.includes('Success') 
-                  ? 'bg-teal-500/20 text-teal-200 border border-teal-400/30 ring-1 ring-teal-400/20' 
-                  : 'bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 ring-1 ring-indigo-400/20'
-              }`}>
-                <div className={`w-2 h-2 rounded-full mr-2 ${
-                  status.includes('Success') ? 'bg-teal-400' : 'bg-indigo-400'
-                }`} />
-                {status}
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+  const handleDeviceSelect = (device: ArduinoDevice) => {
+    setSelectedDevice(device);
+  };
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Connection Status Card */}
-            <div className="bg-gradient-to-br from-indigo-900/40 to-indigo-800/40 backdrop-blur-lg rounded-xl shadow-lg overflow-hidden border border-indigo-500/20">
-              <div className="p-6">
-                <h2 className="text-lg font-semibold text-indigo-100 tracking-tight mb-4">System Status</h2>
-                <div className="space-y-4">
-                  <div>
-                    <div className="text-sm font-medium text-indigo-200 mb-1">Connection</div>
-                    <div className={`text-sm ${status.includes('Success') ? 'text-teal-300' : 'text-indigo-300'}`}>
-                      {status}
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-50">
+      <div className="container mx-auto px-4 py-8">
+        <header className="mb-8">
+          <h1 className="text-3xl font-bold text-blue-900 mb-2">
+            Arduino IoT Cloud Dashboard
+          </h1>
+          <p className="text-blue-700">
+            Monitor and control your Arduino IoT Cloud devices
+          </p>
+        </header>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900"></div>
+          </div>
+        ) : error ? (
+          <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 mb-8">
+            <h2 className="text-lg font-semibold text-rose-900 mb-2">Connection Error</h2>
+            <p className="text-rose-800">{error}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-8">
+              <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
+                  <h2 className="text-xl font-semibold text-gray-800">
+                    Device List
+                  </h2>
+                </div>
+                <div className="p-6">
+                  {client && (
+                    <DeviceList 
+                      client={client}
+                      onDeviceSelect={handleDeviceSelect}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="lg:col-span-4">
+              <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
+                  <h2 className="text-xl font-semibold text-gray-800">
+                    Connection Status
+                  </h2>
+                </div>
+                <div className="p-6">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <div className={`h-3 w-3 rounded-full ${isConnected ? 'bg-teal-500' : 'bg-rose-500'}`}></div>
+                    <span className={`font-medium ${isConnected ? 'text-teal-700' : 'text-rose-700'}`}>
+                      {isConnected ? 'Connected' : 'Disconnected'}
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Client ID:</span>
+                      <span className={process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID ? 'text-teal-600' : 'text-rose-600'}>
+                        {process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID ? 'Present' : 'Missing'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Client Secret:</span>
+                      <span className={process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET ? 'text-teal-600' : 'text-rose-600'}>
+                        {process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET ? 'Present' : 'Missing'}
+                      </span>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-medium text-indigo-200 mb-2">Environment</div>
-                    <ul className="space-y-2 text-sm">
-                      <li className="flex items-center">
-                        <span className={`w-6 h-6 rounded-full mr-2 flex items-center justify-center backdrop-blur-sm shadow-lg ring-1 ${
-                          process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID 
-                            ? 'bg-teal-500/20 text-teal-200 ring-teal-400/30' 
-                            : 'bg-rose-500/20 text-rose-200 ring-rose-400/30'
-                        }`}>
-                          {process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID ? '✓' : '✗'}
-                        </span>
-                        <span className="text-indigo-200">Client ID</span>
-                      </li>
-                      <li className="flex items-center">
-                        <span className={`w-6 h-6 rounded-full mr-2 flex items-center justify-center backdrop-blur-sm shadow-lg ring-1 ${
-                          process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET 
-                            ? 'bg-teal-500/20 text-teal-200 ring-teal-400/30' 
-                            : 'bg-rose-500/20 text-rose-200 ring-rose-400/30'
-                        }`}>
-                          {process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET ? '✓' : '✗'}
-                        </span>
-                        <span className="text-indigo-200">Client Secret</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-gradient-to-br from-indigo-900/40 to-indigo-800/40 backdrop-blur-lg rounded-xl shadow-lg overflow-hidden border border-indigo-500/20">
-              <div className="p-6">
-                <h2 className="text-lg font-semibold text-indigo-100 tracking-tight mb-4">Quick Actions</h2>
-                <div className="space-y-3">
-                  <button 
-                    onClick={() => window.location.reload()}
-                    className="w-full px-4 py-2.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-100 rounded-lg text-sm font-medium transition-colors duration-300 border border-indigo-500/30 shadow-lg hover:shadow-indigo-500/10 ring-1 ring-indigo-400/20"
-                  >
-                    Refresh Connection
-                  </button>
-                  <a 
-                    href="https://create.arduino.cc/iot/things"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full px-4 py-2.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-100 rounded-lg text-sm font-medium text-center transition-colors duration-300 border border-indigo-500/30 shadow-lg hover:shadow-indigo-500/10 ring-1 ring-indigo-400/20"
-                  >
-                    Open Arduino IoT Cloud
-                  </a>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            {error ? (
-              <div className="bg-gradient-to-br from-indigo-900/40 to-indigo-800/40 backdrop-blur-lg rounded-xl shadow-lg overflow-hidden border border-indigo-500/20">
-                <div className="p-6">
-                  <div className="flex items-center space-x-3 text-rose-300 mb-4">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <h2 className="text-lg font-semibold">Connection Error</h2>
-                  </div>
-                  <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-4">
-                    <p className="text-rose-200">{error}</p>
-                  </div>
-                </div>
-              </div>
-            ) : isAuthenticated ? (
-              <div className="bg-gradient-to-br from-indigo-900/40 to-indigo-800/40 backdrop-blur-lg rounded-xl shadow-lg overflow-hidden border border-indigo-500/20">
-                <div className="border-b border-indigo-500/20 p-6">
-                  <h2 className="text-lg font-semibold text-indigo-100 tracking-tight">Your Devices</h2>
-                  <p className="mt-1 text-sm text-indigo-300/90">
-                    Monitor your IceAlert sensors in real-time
-                  </p>
-                </div>
-                <div className="p-6">
-                  <DeviceList />
-                </div>
-              </div>
-            ) : (
-              <div className="bg-gradient-to-br from-indigo-900/40 to-indigo-800/40 backdrop-blur-lg rounded-xl shadow-lg overflow-hidden border border-indigo-500/20">
-                <div className="p-6">
-                  <div className="flex items-center justify-center h-32">
-                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-indigo-300 border-t-transparent" />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
-    </div>
+        )}
+      </div>
+    </main>
   );
 } 
