@@ -110,7 +110,7 @@ async function handleRequest(request: NextRequest) {
       return NextResponse.json(
         { 
           error: 'Failed to parse response',
-          details: error.message,
+          details: error instanceof Error ? error.message : 'Unknown error',
           url: url
         },
         { 
@@ -141,12 +141,12 @@ async function handleRequest(request: NextRequest) {
       headers: corsHeaders
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Proxy error:', error);
     return NextResponse.json(
       { 
-        error: `Proxy request failed: ${error.message}`,
-        stack: error.stack
+        error: `Proxy request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        stack: error instanceof Error ? error.stack : undefined
       },
       { 
         status: 500,
