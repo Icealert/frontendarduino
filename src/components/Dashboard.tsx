@@ -16,27 +16,36 @@ interface Notification {
 export default function Dashboard() {
   const [selectedDevice, setSelectedDevice] = useState<ArduinoDevice | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [client, setClient] = useState<any>(null);
+  const [devices, setDevices] = useState<ArduinoDevice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Initialize client
-    const initClient = async () => {
+    // Initialize and fetch devices
+    const fetchDevices = async () => {
       try {
+        setIsLoading(true);
         const response = await fetch('/api/arduino');
         const data = await response.json();
         
         if (data.error) {
           addNotification('error', data.error);
+          setError(data.error);
         } else {
-          setClient(data.client);
+          setDevices(data.devices || []);
           addNotification('success', 'Successfully connected to Arduino IoT Cloud');
+          setError(null);
         }
       } catch (err) {
-        addNotification('error', 'Failed to connect to Arduino IoT Cloud');
+        const errorMessage = 'Failed to connect to Arduino IoT Cloud';
+        addNotification('error', errorMessage);
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    initClient();
+    fetchDevices();
   }, []);
 
   const addNotification = (type: Notification['type'], message: string) => {
@@ -61,7 +70,8 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             <DeviceList
-              client={client}
+              devices={devices}
+              selectedDevice={selectedDevice || undefined}
               onDeviceSelect={setSelectedDevice}
             />
             {selectedDevice && (
