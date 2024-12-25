@@ -7,7 +7,7 @@ const ARDUINO_API_BASE = 'https://api2.arduino.cc/iot';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
 export async function POST(request: NextRequest) {
@@ -19,6 +19,14 @@ export async function POST(request: NextRequest) {
     const grantType = formData.get('grant_type');
     const audience = formData.get('audience');
 
+    // Log request details for debugging
+    console.log('Token request received:', {
+      clientId: clientId ? '[REDACTED]' : undefined,
+      clientSecret: clientSecret ? '[REDACTED]' : undefined,
+      grantType,
+      audience
+    });
+
     // Validate required fields
     if (!clientId || !clientSecret || !grantType || !audience) {
       return NextResponse.json(
@@ -27,8 +35,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Construct the Arduino API URL
+    const arduinoTokenUrl = new URL('/v1/clients/token', ARDUINO_API_BASE);
+
     // Make request to Arduino IoT Cloud API
-    const response = await fetch(`${ARDUINO_API_BASE}/v1/clients/token`, {
+    const response = await fetch(arduinoTokenUrl.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -45,6 +56,11 @@ export async function POST(request: NextRequest) {
     let responseData;
     try {
       responseData = await response.json();
+      console.log('Arduino API response received:', {
+        status: response.status,
+        ok: response.ok,
+        hasAccessToken: !!responseData?.access_token
+      });
     } catch (error) {
       console.error('Failed to parse Arduino API response:', error);
       return NextResponse.json(

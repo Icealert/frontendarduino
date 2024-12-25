@@ -19,6 +19,13 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     throw new Error('Client ID and Client Secret are required');
   }
 
+  // Get base URL from window location
+  const baseUrl = typeof window !== 'undefined' 
+    ? window.location.origin 
+    : process.env.NEXT_PUBLIC_VERCEL_URL 
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : 'http://localhost:3000';
+
   // Create form data for token request
   const formData = new FormData();
   formData.append('grant_type', 'client_credentials');
@@ -26,8 +33,8 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
   formData.append('client_secret', clientSecret);
   formData.append('audience', 'https://api2.arduino.cc/iot');
 
-  // Get access token from our token endpoint
-  const tokenResponse = await fetch('/api/arduino/token', {
+  // Get access token from our token endpoint using absolute URL
+  const tokenResponse = await fetch(`${baseUrl}/api/arduino/token`, {
     method: 'POST',
     body: formData
   });
@@ -57,7 +64,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
   const access_token = tokenData.access_token;
 
   const makeRequest = async (endpoint: string, options: RequestInit = {}) => {
-    const url = '/api/arduino/proxy?endpoint=' + encodeURIComponent(endpoint);
+    const url = `${baseUrl}/api/arduino/proxy?endpoint=${encodeURIComponent(endpoint)}`;
 
     const response = await fetch(url, {
       ...options,
