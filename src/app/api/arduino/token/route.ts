@@ -21,15 +21,9 @@ export async function POST(request: NextRequest) {
     // Get credentials from environment if not in request
     const clientId = params.get('client_id') || process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID;
     const clientSecret = params.get('client_secret') || process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET;
-    const grantType = params.get('grant_type') || 'client_credentials';
-    const audience = params.get('audience') || 'https://api2.arduino.cc/iot';
 
     // Log request details for debugging
     console.log('Token request parameters:', {
-      clientId: clientId ? '[REDACTED]' : undefined,
-      clientSecret: clientSecret ? '[REDACTED]' : undefined,
-      grantType,
-      audience,
       hasClientId: !!clientId,
       hasClientSecret: !!clientSecret
     });
@@ -48,28 +42,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare request body exactly as per Arduino docs
-    const requestBody = new URLSearchParams();
-    requestBody.append('grant_type', grantType);
-    requestBody.append('client_id', clientId);
-    requestBody.append('client_secret', clientSecret);
-    requestBody.append('audience', audience);
-
-    console.log('Making request to Arduino API:', {
-      url: `${ARDUINO_API_BASE}/v1/clients/token`,
+    // Make request to Arduino IoT Cloud API exactly as per curl example
+    const response = await fetch('https://api2.arduino.cc/iot/v1/clients/token', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
-
-    // Make request to Arduino IoT Cloud API
-    const response = await fetch(`${ARDUINO_API_BASE}/v1/clients/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'content-type': 'application/x-www-form-urlencoded'
       },
-      body: requestBody.toString()
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+        audience: 'https://api2.arduino.cc/iot'
+      }).toString()
     });
 
     const responseText = await response.text();

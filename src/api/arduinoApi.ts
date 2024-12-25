@@ -28,22 +28,18 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
 
   console.log('Creating Arduino API client with base URL:', baseUrl);
 
-  // Create token request body exactly as per Arduino docs
-  const requestBody = new URLSearchParams();
-  requestBody.append('grant_type', 'client_credentials');
-  requestBody.append('client_id', clientId);
-  requestBody.append('client_secret', clientSecret);
-  requestBody.append('audience', 'https://api2.arduino.cc/iot');
-
-  console.log('Making token request to:', `${baseUrl}/api/arduino/token`);
-
   // Get access token from our token endpoint using absolute URL
   const tokenResponse = await fetch(`${baseUrl}/api/arduino/token`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
+      'content-type': 'application/x-www-form-urlencoded'
     },
-    body: requestBody.toString()
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+      audience: 'https://api2.arduino.cc/iot'
+    }).toString()
   });
 
   const responseText = await tokenResponse.text();
@@ -89,8 +85,8 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       headers: {
         ...options.headers,
         'Authorization': `Bearer ${access_token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'content-type': 'application/json',
+        'accept': 'application/json'
       }
     });
 
