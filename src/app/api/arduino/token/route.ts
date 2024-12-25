@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+export const runtime = 'nodejs';
 
-export const runtime = 'edge';
+import { NextRequest, NextResponse } from 'next/server';
 
 const ARDUINO_API_BASE = 'https://api2.arduino.cc/iot';
 

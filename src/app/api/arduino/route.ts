@@ -1,7 +1,15 @@
 export const runtime = 'nodejs';
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createArduinoApiClient } from '@/api/arduinoApi';
+
+const ARDUINO_API_BASE = 'https://api2.arduino.cc/iot';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
 
 export async function GET() {
   try {
