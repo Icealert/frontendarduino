@@ -15,6 +15,10 @@ interface TokenResponse {
 }
 
 export async function createArduinoApiClient(clientId: string, clientSecret: string): Promise<ArduinoApiClient> {
+  if (!clientId || !clientSecret) {
+    throw new Error('Client ID and Client Secret are required');
+  }
+
   // Get access token through our proxy API
   const tokenResponse = await fetch('/api/arduino/proxy?endpoint=' + encodeURIComponent('clients/token'), {
     method: 'POST',
@@ -31,35 +35,31 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
   });
 
   if (!tokenResponse.ok) {
-    const error = await tokenResponse.json().catch(() => ({ error: tokenResponse.statusText }));
-    console.error('Token response error:', error);
-    throw new Error(`Failed to get access token: ${error.error || error.message || tokenResponse.statusText}`);
+    let errorMessage = 'Failed to obtain access token';
+    try {
+      const errorData = await tokenResponse.json();
+      errorMessage = errorData.error || errorMessage;
+    } catch {
+      errorMessage = tokenResponse.statusText;
+    }
+    throw new Error(errorMessage);
   }
 
   let tokenData: TokenResponse;
   try {
     tokenData = await tokenResponse.json();
-    console.log('Token response received:', {
-      hasToken: !!tokenData?.access_token,
-      expiresIn: tokenData?.expires_in,
-      tokenType: tokenData?.token_type
-    });
   } catch (error) {
-    console.error('Failed to parse token response:', error);
     throw new Error('Failed to parse token response');
   }
 
   if (!tokenData?.access_token) {
-    console.error('Invalid token data:', JSON.stringify(tokenData, null, 2));
-    throw new Error('Invalid token response format from Arduino IoT Cloud');
+    throw new Error('No access token received from Arduino IoT Cloud');
   }
 
   const access_token = tokenData.access_token;
-  console.log('Access token obtained successfully');
 
   const makeRequest = async (endpoint: string, options: RequestInit = {}) => {
     const url = '/api/arduino/proxy?endpoint=' + encodeURIComponent(endpoint);
-    console.log('Making request to:', url);
 
     const response = await fetch(url, {
       ...options,
@@ -67,13 +67,19 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
         ...options.headers,
         'Authorization': `Bearer ${access_token}`,
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       }
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: response.statusText }));
-      console.error('API request error:', error);
-      throw new Error(`API request failed: ${error.error || error.message || response.statusText}`);
+      let errorMessage = 'API request failed';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        errorMessage = response.statusText;
+      }
+      throw new Error(errorMessage);
     }
 
     return response.json();

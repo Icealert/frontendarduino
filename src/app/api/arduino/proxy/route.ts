@@ -50,38 +50,33 @@ async function handleRequest(request: NextRequest) {
 
     // Get the request body if it exists
     let body: string | undefined;
-    if (request.method !== 'GET') {
-      body = await request.text();
-      console.log('Request body:', body);
-    }
-
-    // Prepare headers
-    const headers: Record<string, string> = {
+    let requestHeaders: Record<string, string> = {
       'Accept': 'application/json',
     };
 
-    // For token requests, use form-urlencoded content type and specific headers
-    if (isTokenRequest) {
-      headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      // Parse the body to get client credentials
-      const formData = new URLSearchParams(body);
-      // Reconstruct the body exactly as specified in Arduino docs
-      body = new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: formData.get('client_id') || '',
-        client_secret: formData.get('client_secret') || '',
-        audience: 'https://api2.arduino.cc/iot'
-      }).toString();
-    } else {
-      headers['Content-Type'] = 'application/json';
-      // Add Authorization header for non-token requests if present
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader) {
-        headers['Authorization'] = authHeader;
+    if (request.method !== 'GET') {
+      if (isTokenRequest) {
+        // For token requests, handle exactly as per Arduino docs
+        requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+        const formData = new URLSearchParams(await request.text());
+        body = new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: formData.get('client_id') || '',
+          client_secret: formData.get('client_secret') || '',
+          audience: 'https://api2.arduino.cc/iot'
+        }).toString();
+      } else {
+        // For other requests, use JSON and include authorization
+        requestHeaders['Content-Type'] = 'application/json';
+        const authHeader = request.headers.get('Authorization');
+        if (authHeader) {
+          requestHeaders['Authorization'] = authHeader;
+        }
+        body = await request.text();
       }
     }
 
-    console.log('Request headers:', headers);
+    console.log('Request headers:', requestHeaders);
     if (isTokenRequest) {
       console.log('Token request body:', body);
     }
@@ -89,77 +84,66 @@ async function handleRequest(request: NextRequest) {
     // Forward the request to Arduino API
     const response = await fetch(url, {
       method: request.method,
-      headers,
+      headers: requestHeaders,
       body
     });
 
-    // Get response data
-    let responseData: any;
-    const contentType = response.headers.get('content-type');
+    // For token requests, handle the response carefully
+    if (isTokenRequest) {
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        console.error('Token request failed:', responseData);
+        return NextResponse.json(
+          { error: responseData.error || 'Failed to obtain access token' },
+          { status: response.status, headers: corsHeaders }
+        );
+      }
 
+      if (!responseData.access_token) {
+        console.error('Invalid token response:', responseData);
+        return NextResponse.json(
+          { error: 'Invalid token response from Arduino IoT Cloud' },
+          { status: 500, headers: corsHeaders }
+        );
+      }
+
+      return NextResponse.json(responseData, { headers: corsHeaders });
+    }
+
+    // For non-token requests, handle response normally
+    let responseData: any;
     try {
-      if (contentType?.includes('application/json')) {
+      if (response.headers.get('content-type')?.includes('application/json')) {
         responseData = await response.json();
-        
-        // For token requests, verify the response format
-        if (isTokenRequest) {
-          console.log('Token response received:', {
-            hasToken: !!responseData?.access_token,
-            expiresIn: responseData?.expires_in,
-            tokenType: responseData?.token_type
-          });
-        }
       } else {
         responseData = await response.text();
       }
-      console.log('Response data type:', typeof responseData);
     } catch (error) {
       console.error('Error parsing response:', error);
       return NextResponse.json(
         { 
           error: 'Failed to parse response',
-          details: error instanceof Error ? error.message : 'Unknown error',
-          url: url
+          details: error instanceof Error ? error.message : 'Unknown error'
         },
-        { 
-          status: 500,
-          headers: corsHeaders
-        }
+        { status: 500, headers: corsHeaders }
       );
     }
 
-    // Handle error responses
     if (!response.ok) {
-      console.error('Arduino API error response:', responseData);
       return NextResponse.json(
-        { 
-          error: `Arduino API request failed: ${typeof responseData === 'string' ? responseData : JSON.stringify(responseData)}`,
-          status: response.status,
-          url: url
-        },
-        { 
-          status: response.status,
-          headers: corsHeaders
-        }
+        { error: typeof responseData === 'string' ? responseData : responseData.error || 'Request failed' },
+        { status: response.status, headers: corsHeaders }
       );
     }
 
-    // Return successful response
-    return NextResponse.json(responseData, {
-      headers: corsHeaders
-    });
+    return NextResponse.json(responseData, { headers: corsHeaders });
 
   } catch (error: unknown) {
     console.error('Proxy error:', error);
     return NextResponse.json(
-      { 
-        error: `Proxy request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        stack: error instanceof Error ? error.stack : undefined
-      },
-      { 
-        status: 500,
-        headers: corsHeaders
-      }
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500, headers: corsHeaders }
     );
   }
 } 
