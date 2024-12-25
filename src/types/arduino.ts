@@ -7,211 +7,123 @@ export interface ArduinoDevice {
   events?: any[];
   properties?: ArduinoProperty[];
   device_status: 'ONLINE' | 'OFFLINE';
-  thing?: {
-    id: string;
-    name: string;
-    properties?: ArduinoProperty[];
-  };
+  connection_type?: string;
+  online?: boolean;
 }
 
 export interface ArduinoProperty {
   id: string;
   name: string;
-  type: string;
+  type: 'String' | 'Float' | 'Integer';
   value: any;
-  persist: boolean;
-  update_strategy: string;
-  update_parameter: number;
-  permission: string;
-  variable_name: string;
   updated_at: string;
+  variable_name?: string;
+  permission?: string;
 }
 
-export interface DeviceSettings {
-  alertEmail: string;
-  cloudflowrate: number;
-  cloudhumidity: number;
-  cloudtemp: number;
-  flowThresholdMin: number;
-  humidityThresholdMax: number;
-  humidityThresholdMin: number;
-  lastUpdateTime: string;
-  noFlowCriticalTime: number;
-  noFlowWarningTime: number;
-  tempThresholdMax: number;
-  tempThresholdMin: number;
-}
+// Property name types for type safety
+export type PropertyName = 
+  | 'alertEmail'
+  | 'cloudflowrate'
+  | 'cloudhumidity'
+  | 'cloudtemp'
+  | 'flowThresholdMin'
+  | 'humidityThresholdMax'
+  | 'humidityThresholdMin'
+  | 'lastUpdateTime'
+  | 'noFlowCriticalTime'
+  | 'noFlowWarningTime'
+  | 'tempThresholdMax'
+  | 'tempThresholdMin';
+
+// Property type mapping
+export const PropertyTypes: Record<PropertyName, 'String' | 'Float' | 'Integer'> = {
+  alertEmail: 'String',
+  cloudflowrate: 'Float',
+  cloudhumidity: 'Float',
+  cloudtemp: 'Float',
+  flowThresholdMin: 'Float',
+  humidityThresholdMax: 'Float',
+  humidityThresholdMin: 'Float',
+  lastUpdateTime: 'String',
+  noFlowCriticalTime: 'Integer',
+  noFlowWarningTime: 'Integer',
+  tempThresholdMax: 'Float',
+  tempThresholdMin: 'Float'
+};
+
+// Property units and formatting
+export const PropertyUnits: Partial<Record<PropertyName, string>> = {
+  cloudtemp: '°C',
+  cloudhumidity: '%',
+  cloudflowrate: 'L/min',
+  flowThresholdMin: 'L/min',
+  humidityThresholdMax: '%',
+  humidityThresholdMin: '%',
+  tempThresholdMax: '°C',
+  tempThresholdMin: '°C',
+  noFlowCriticalTime: 'min',
+  noFlowWarningTime: 'min'
+};
 
 // Helper functions
-export function isEditable(propertyName: string): boolean {
-  const editableProperties = [
-    'alertEmail',
-    'flowThresholdMin',
-    'humidityThresholdMax',
-    'humidityThresholdMin',
-    'noFlowCriticalTime',
-    'noFlowWarningTime',
-    'tempThresholdMax',
-    'tempThresholdMin'
-  ];
-  return editableProperties.includes(propertyName);
-}
+export function formatValue(name: PropertyName, value: any): string {
+  if (value === null || value === undefined) return 'Not set';
 
-export function getInputType(propertyName: string): string {
-  switch (propertyName) {
-    case 'alertEmail':
-      return 'email';
-    case 'lastUpdateTime':
-      return 'datetime-local';
-    case 'noFlowCriticalTime':
-    case 'noFlowWarningTime':
-      return 'number';
-    case 'flowThresholdMin':
-    case 'humidityThresholdMax':
-    case 'humidityThresholdMin':
-    case 'tempThresholdMax':
-    case 'tempThresholdMin':
-      return 'number';
-    default:
-      return 'text';
-  }
-}
-
-export function getDefaultValue(propertyName: string): any {
-  switch (propertyName) {
-    case 'alertEmail':
-      return '';
-    case 'cloudflowrate':
-    case 'cloudhumidity':
-    case 'cloudtemp':
-      return 0;
-    case 'flowThresholdMin':
-      return 5.0;
-    case 'humidityThresholdMax':
-      return 80.0;
-    case 'humidityThresholdMin':
-      return 20.0;
-    case 'lastUpdateTime':
-      return new Date().toISOString();
-    case 'noFlowCriticalTime':
-      return 5;
-    case 'noFlowWarningTime':
-      return 3;
-    case 'tempThresholdMax':
-      return 30.0;
-    case 'tempThresholdMin':
-      return 10.0;
-    default:
-      return null;
-  }
-}
-
-export function validateValue(propertyName: string, value: any): boolean {
-  switch (propertyName) {
-    case 'alertEmail':
-      return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-    case 'cloudflowrate':
-    case 'cloudhumidity':
-    case 'cloudtemp':
-      return typeof value === 'number' && !isNaN(value);
-    case 'flowThresholdMin':
-    case 'humidityThresholdMax':
-    case 'humidityThresholdMin':
-    case 'tempThresholdMax':
-    case 'tempThresholdMin':
-      return typeof value === 'number' && !isNaN(value) && Number.isFinite(value);
-    case 'lastUpdateTime':
-      return typeof value === 'string' && !isNaN(Date.parse(value));
-    case 'noFlowCriticalTime':
-    case 'noFlowWarningTime':
-      return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-    default:
-      return true;
-  }
-}
-
-export function formatValue(name: string, value: any): string {
   switch (name) {
-    case 'cloudtemp':
-    case 'tempThresholdMin':
-    case 'tempThresholdMax':
-      return `${value}°C`;
-    case 'cloudhumidity':
-    case 'humidityThresholdMin':
-    case 'humidityThresholdMax':
-      return `${value}%`;
-    case 'cloudflowrate':
-    case 'flowThresholdMin':
-      return `${value} L/min`;
-    case 'noFlowWarningTime':
-    case 'noFlowCriticalTime':
-      return `${value} min`;
     case 'lastUpdateTime':
       return new Date(value).toLocaleString();
     case 'alertEmail':
       return value || 'Not set';
     default:
-      return String(value);
+      const unit = PropertyUnits[name];
+      return unit ? `${value}${unit}` : String(value);
   }
 }
 
-export function getStatusColor(propertyName: string, value: any): string {
-  // Measurement variables
-  if (['cloudtemp', 'cloudhumidity', 'cloudflowrate'].includes(propertyName)) {
-    return 'text-blue-300';
-  }
-  // Threshold variables
-  if (propertyName.includes('Threshold')) {
-    return 'text-amber-300';
-  }
-  // Time variables
-  if (propertyName.includes('Time')) {
-    return 'text-indigo-300';
-  }
-  // Email
-  if (propertyName === 'alertEmail') {
-    return value ? 'text-teal-300' : 'text-rose-300';
-  }
-  return 'text-slate-300';
+export function getPropertyGroup(name: PropertyName): string {
+  if (name.startsWith('cloud')) return 'Measurements';
+  if (name.includes('Threshold')) return 'Thresholds';
+  if (name.includes('Time')) return 'Timing';
+  return 'Configuration';
 }
 
-export function groupProperties(properties: ArduinoProperty[]) {
-  const groups = {
-    measurements: ['cloudtemp', 'cloudhumidity', 'cloudflowrate'],
-    thresholds: [
-      'tempThresholdMin', 
-      'tempThresholdMax', 
-      'humidityThresholdMin', 
-      'humidityThresholdMax', 
-      'flowThresholdMin'
-    ],
-    timing: ['noFlowWarningTime', 'noFlowCriticalTime', 'lastUpdateTime'],
-    config: ['alertEmail']
-  };
+export function groupProperties(properties: ArduinoProperty[]): { group: string; properties: ArduinoProperty[] }[] {
+  const groups = new Map<string, ArduinoProperty[]>();
 
-  return Object.entries(groups).map(([group, propertyNames]) => ({
+  properties.forEach(prop => {
+    const group = getPropertyGroup(prop.name as PropertyName);
+    if (!groups.has(group)) {
+      groups.set(group, []);
+    }
+    groups.get(group)!.push(prop);
+  });
+
+  return Array.from(groups.entries()).map(([group, props]) => ({
     group,
-    properties: properties.filter(p => propertyNames.includes(p.name))
+    properties: props
   }));
 }
 
-export function getStepValue(propertyName: string): string {
-  switch (propertyName) {
-    case 'cloudtemp':
-    case 'tempThresholdMin':
-    case 'tempThresholdMax':
-      return '0.1'; // Temperature in 0.1°C steps
-    case 'cloudhumidity':
-    case 'humidityThresholdMin':
-    case 'humidityThresholdMax':
-      return '1'; // Humidity in 1% steps
-    case 'cloudflowrate':
-    case 'flowThresholdMin':
-      return '0.1'; // Flow rate in 0.1 L/min steps
-    case 'noFlowWarningTime':
-    case 'noFlowCriticalTime':
-      return '1'; // Time in 1 minute steps
+export function validatePropertyValue(name: PropertyName, value: any): boolean {
+  const type = PropertyTypes[name];
+  
+  switch (type) {
+    case 'String':
+      if (name === 'alertEmail') {
+        return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+      }
+      return typeof value === 'string';
+      
+    case 'Float':
+      const numValue = parseFloat(value);
+      return !isNaN(numValue) && isFinite(numValue);
+      
+    case 'Integer':
+      const intValue = parseInt(value, 10);
+      return !isNaN(intValue) && Number.isInteger(intValue) && intValue >= 0;
+      
     default:
-      return 'any';
+      return true;
   }
 } 
