@@ -9,17 +9,18 @@ export default function ClientDashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [client, setClient] = useState<ArduinoApiClient | null>(null);
+  const [devices, setDevices] = useState<ArduinoDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<ArduinoDevice | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function initializeArduino() {
       try {
-      
         const arduinoClient = await createArduinoApiClient();
         setClient(arduinoClient);
         setIsConnected(true);
         setError(null);
+        fetchDevices();
       } catch (err: any) {
         console.error('Failed to initialize Arduino client:', err);
         setError(err.message || 'Failed to connect to Arduino IoT Cloud');
@@ -31,6 +32,23 @@ export default function ClientDashboard() {
 
     initializeArduino();
   }, []);
+
+  const fetchDevices = async () => {
+    try {
+      const response = await fetch('/api/arduino');
+      const data = await response.json();
+      
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setDevices(data.devices || []);
+        setError(null);
+      }
+    } catch (err) {
+      setError('Failed to fetch devices');
+      console.error('Error fetching devices:', err);
+    }
+  };
 
   const handleDeviceSelect = (device: ArduinoDevice) => {
     setSelectedDevice(device);
@@ -68,7 +86,8 @@ export default function ClientDashboard() {
               <div className="p-6">
                 {client && (
                   <DeviceList 
-                    client={client}
+                    devices={devices}
+                    selectedDevice={selectedDevice || undefined}
                     onDeviceSelect={handleDeviceSelect}
                   />
                 )}
@@ -92,12 +111,10 @@ export default function ClientDashboard() {
                 <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex justify-between">
                     <span>Client ID:</span>
-                    {/* Optional: remove or replace with server-based data if needed */}
                     <span className="text-rose-600">Hidden (server-only)</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Client Secret:</span>
-                   {/* Optional: remove or replace with server-based data if needed */}
                     <span className="text-rose-600">Hidden (server-only)</span>
                   </div>
                 </div>
