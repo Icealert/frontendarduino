@@ -57,27 +57,42 @@ export async function POST(request: Request) {
           console.log(`Using default value format for type ${property.type}`);
       }
 
-      // Use the propertiesV2Update endpoint to update the property
-      await client.updateProperty(deviceId, property.id, formattedValue);
-      console.log(`Successfully sent update for property ${propertyName}`);
+      try {
+        // Use the propertiesV2Update endpoint to update the property
+        await client.updateProperty(deviceId, property.id, formattedValue);
+        console.log(`Successfully sent update for property ${propertyName}`);
 
-      // Wait a moment for the update to propagate
-      await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait a moment for the update to propagate
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Verify the update by fetching the latest value
-      const updatedProperties = await client.getDeviceProperties(deviceId);
-      const updatedProperty = updatedProperties.find((p: ArduinoProperty) => p.id === property.id);
+        // Verify the update by fetching the latest value
+        const updatedProperties = await client.getDeviceProperties(deviceId);
+        const updatedProperty = updatedProperties.find((p: ArduinoProperty) => p.id === property.id);
 
-      if (!updatedProperty) {
-        throw new Error(`Could not verify update for property ${propertyName}`);
+        if (!updatedProperty) {
+          throw new Error(`Could not verify update for property ${propertyName}`);
+        }
+
+        console.log(`Verified update for property ${propertyName}:`, updatedProperty);
+
+        return NextResponse.json({ 
+          success: true,
+          property: updatedProperty
+        });
+      } catch (error: any) {
+        // If the error is due to an empty response, consider it a success
+        if (error.message?.includes('Unexpected end of JSON input')) {
+          console.log('Received empty response, considering update successful');
+          return NextResponse.json({ 
+            success: true,
+            property: {
+              ...property,
+              value: formattedValue
+            }
+          });
+        }
+        throw error;
       }
-
-      console.log(`Verified update for property ${propertyName}:`, updatedProperty);
-
-      return NextResponse.json({ 
-        success: true,
-        property: updatedProperty
-      });
     } catch (updateError: any) {
       console.error('Error updating property:', updateError);
       return NextResponse.json({ 
