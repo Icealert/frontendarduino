@@ -34,9 +34,16 @@ export async function createArduinoApiClient(
   // Create form data for token request
   const formData = new FormData();
   formData.append('grant_type', 'client_credentials');
-  formData.append('client_id', clientId);
-  formData.append('client_secret', clientSecret);
+  formData.append('client_id', String(clientId));
+  formData.append('client_secret', String(clientSecret));
   formData.append('audience', 'https://api2.arduino.cc/iot');
+
+  console.log('Token request parameters:', {
+    hasClientId: !!clientId,
+    hasClientSecret: !!clientSecret,
+    clientIdLength: clientId.length,
+    clientSecretLength: clientSecret.length
+  });
 
   // Get access token through proxy endpoint
   const tokenResponse = await fetch(`${baseUrl}/api/arduino/proxy?endpoint=clients/token`, {

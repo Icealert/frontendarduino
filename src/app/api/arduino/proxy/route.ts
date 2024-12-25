@@ -73,12 +73,21 @@ async function handleRequest(request: NextRequest) {
       if (endpoint === 'clients/token') {
         requestHeaders['content-type'] = 'application/x-www-form-urlencoded';
         const formData = await request.formData();
-        body = new URLSearchParams({
-          grant_type: 'client_credentials',
-          client_id: formData.get('client_id') || '',
-          client_secret: formData.get('client_secret') || '',
-          audience: 'https://api2.arduino.cc/iot'
-        }).toString();
+        
+        // Create URLSearchParams with explicit string conversion
+        const params = new URLSearchParams();
+        params.append('grant_type', 'client_credentials');
+        params.append('client_id', String(formData.get('client_id') || ''));
+        params.append('client_secret', String(formData.get('client_secret') || ''));
+        params.append('audience', 'https://api2.arduino.cc/iot');
+        
+        body = params.toString();
+
+        console.log('Token request body:', {
+          hasClientId: !!formData.get('client_id'),
+          hasClientSecret: !!formData.get('client_secret'),
+          bodyLength: body.length
+        });
       } else {
         // For other requests, use JSON
         requestHeaders['content-type'] = 'application/json';
