@@ -79,7 +79,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     return response.json();
   }
 
-  return {
+  const client: ArduinoApiClient = {
     async getDevices() {
       console.log('Fetching devices...');
       const data = await makeRequest('/things');
@@ -114,7 +114,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
 
     async getDeviceSettings(deviceId: string) {
       console.log(`Fetching settings for device ${deviceId}...`);
-      const properties = await this.getDeviceProperties(deviceId);
+      const properties = await client.getDeviceProperties(deviceId);
       
       const settings = {
         temperatureRange: {
@@ -141,39 +141,39 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       
       if (settings.temperatureRange) {
         updates.push(
-          this.updateProperty(deviceId, 'tempThresholdMin', settings.temperatureRange.min),
-          this.updateProperty(deviceId, 'tempThresholdMax', settings.temperatureRange.max)
+          client.updateProperty(deviceId, 'tempThresholdMin', settings.temperatureRange.min),
+          client.updateProperty(deviceId, 'tempThresholdMax', settings.temperatureRange.max)
         );
       }
       
       if (settings.humidityRange) {
         updates.push(
-          this.updateProperty(deviceId, 'humidityThresholdMin', settings.humidityRange.min),
-          this.updateProperty(deviceId, 'humidityThresholdMax', settings.humidityRange.max)
+          client.updateProperty(deviceId, 'humidityThresholdMin', settings.humidityRange.min),
+          client.updateProperty(deviceId, 'humidityThresholdMax', settings.humidityRange.max)
         );
       }
       
       if (settings.flowRateThreshold !== undefined) {
         updates.push(
-          this.updateProperty(deviceId, 'flowThresholdMin', settings.flowRateThreshold)
+          client.updateProperty(deviceId, 'flowThresholdMin', settings.flowRateThreshold)
         );
       }
       
       if (settings.noFlowWarningTime !== undefined) {
         updates.push(
-          this.updateProperty(deviceId, 'noFlowWarningTime', settings.noFlowWarningTime)
+          client.updateProperty(deviceId, 'noFlowWarningTime', settings.noFlowWarningTime)
         );
       }
       
       if (settings.noFlowCriticalTime !== undefined) {
         updates.push(
-          this.updateProperty(deviceId, 'noFlowCriticalTime', settings.noFlowCriticalTime)
+          client.updateProperty(deviceId, 'noFlowCriticalTime', settings.noFlowCriticalTime)
         );
       }
       
       if (settings.alertEmail !== undefined) {
         updates.push(
-          this.updateProperty(deviceId, 'alertEmail', settings.alertEmail)
+          client.updateProperty(deviceId, 'alertEmail', settings.alertEmail)
         );
       }
       
@@ -181,4 +181,6 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       console.log('All settings updated successfully');
     },
   };
+
+  return client;
 } 
