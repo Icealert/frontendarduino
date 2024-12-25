@@ -31,6 +31,7 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
   const [saving, setSaving] = useState<{[key: string]: boolean}>({});
   const [deviceProperties, setDeviceProperties] = useState<{[key: string]: ArduinoProperty[]}>({});
   const [loadingProperties, setLoadingProperties] = useState<{[key: string]: boolean}>({});
+  const [editMode, setEditMode] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     fetchDevices();
@@ -74,7 +75,7 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
       }));
     } catch (err) {
       console.error('Failed to fetch device properties:', err);
-      // Show error in UI
+      setError('Failed to fetch device properties');
     } finally {
       setLoadingProperties(prev => ({ ...prev, [deviceId]: false }));
     }
@@ -88,41 +89,66 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
   };
 
   const handlePropertyChange = async (deviceId: string, propertyName: string, value: any) => {
-    try {
-      setSaving(prev => ({ ...prev, [propertyName]: true }));
-      
-      const response = await fetch('/api/arduino/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          deviceId,
-          propertyName,
-          value
-        }),
-      });
+    setEditableValues(prev => ({
+      ...prev,
+      [propertyName]: value
+    }));
+  };
 
-      const data = await response.json();
+  const handleSaveChanges = async (deviceId: string) => {
+    try {
+      setSaving(prev => ({ ...prev, deviceId: true }));
       
-      if (data.error) {
-        throw new Error(data.error);
+      // Get all changed properties for this device
+      const changedProperties = Object.entries(editableValues)
+        .filter(([_, value]) => value !== undefined)
+        .map(([name, value]) => ({
+          name,
+          value: value
+        }));
+
+      if (changedProperties.length === 0) return;
+
+      // Save each changed property
+      for (const prop of changedProperties) {
+        const response = await fetch('/api/arduino/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            deviceId,
+            propertyName: prop.name,
+            value: prop.value
+          }),
+        });
+
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
       }
 
       // Update local state
       setDeviceProperties(prev => ({
         ...prev,
         [deviceId]: prev[deviceId]?.map(prop => 
-          prop.name === propertyName ? { ...prop, value } : prop
+          editableValues[prop.name] !== undefined
+            ? { ...prop, value: editableValues[prop.name] }
+            : prop
         ) || []
       }));
 
-      setEditableValues(prev => ({ ...prev, [propertyName]: undefined }));
+      // Clear editable values
+      setEditableValues({});
+      setEditMode(prev => ({ ...prev, [deviceId]: false }));
+
     } catch (err) {
-      console.error('Failed to save value:', err);
-      // Show error in UI
+      console.error('Failed to save changes:', err);
+      setError('Failed to save changes');
     } finally {
-      setSaving(prev => ({ ...prev, [propertyName]: false }));
+      setSaving(prev => ({ ...prev, deviceId: false }));
     }
   };
 
@@ -168,6 +194,32 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
               </p>
             </div>
             <div className="flex items-center space-x-2">
+              {expandedDevice === device.id && (
+                <button
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors
+                    ${editMode[device.id]
+                      ? 'bg-teal-500 hover:bg-teal-600 text-white'
+                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                    }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (editMode[device.id]) {
+                      handleSaveChanges(device.id);
+                    } else {
+                      setEditMode(prev => ({ ...prev, [device.id]: true }));
+                    }
+                  }}
+                  disabled={saving[device.id]}
+                >
+                  {saving[device.id] ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : editMode[device.id] ? (
+                    'Save Changes'
+                  ) : (
+                    'Edit Values'
+                  )}
+                </button>
+              )}
               <button
                 className="p-2 hover:bg-slate-600 rounded-full transition-colors"
                 onClick={(e) => {
@@ -197,26 +249,15 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
                       {properties.map(prop => (
                         <div key={prop.name} className="flex items-center justify-between">
                           <span className="text-slate-300 font-medium">{prop.name}</span>
-                          {isEditable(prop.name) ? (
+                          {isEditable(prop.name) && editMode[device.id] ? (
                             <div className="flex items-center space-x-2">
                               <input
                                 type={getInputType(prop.name)}
                                 step={getStepValue(prop.name)}
                                 value={editableValues[prop.name] ?? prop.value}
-                                onChange={(e) => setEditableValues(prev => ({
-                                  ...prev,
-                                  [prop.name]: e.target.value
-                                }))}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    handlePropertyChange(device.id, prop.name, editableValues[prop.name]);
-                                  }
-                                }}
+                                onChange={(e) => handlePropertyChange(device.id, prop.name, e.target.value)}
                                 className="bg-slate-700 text-slate-100 rounded px-2 py-1 w-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
-                              {saving[prop.name] && (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                              )}
                             </div>
                           ) : (
                             <span className={`${getStatusColor(prop.name, prop.value)} font-medium`}>
