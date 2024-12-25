@@ -7,15 +7,16 @@ const ARDUINO_API_BASE = 'https://api2.arduino.cc/iot';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept',
 };
 
 export async function POST(request: NextRequest) {
   try {
-    // Get request body as text and parse it
+    // Get request body as text
     const body = await request.text();
     console.log('Raw request body:', body);
 
+    // Parse the form data
     const params = new URLSearchParams(body);
     
     // Get credentials from environment if not in request
@@ -42,18 +43,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Make request to Arduino IoT Cloud API exactly as per curl example
+    // Make request to Arduino IoT Cloud API exactly as per docs
     const response = await fetch('https://api2.arduino.cc/iot/v1/clients/token', {
       method: 'POST',
       headers: {
-        'content-type': 'application/x-www-form-urlencoded'
+        'content-type': 'application/x-www-form-urlencoded',
+        'accept': 'application/json'
       },
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: clientId,
-        client_secret: clientSecret,
-        audience: 'https://api2.arduino.cc/iot'
-      }).toString()
+      body: `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&audience=https://api2.arduino.cc/iot`
     });
 
     const responseText = await response.text();

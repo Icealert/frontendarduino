@@ -19,7 +19,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     throw new Error('Client ID and Client Secret are required');
   }
 
-  // Get base URL from window location
+  // Get base URL from window location or environment
   const baseUrl = typeof window !== 'undefined' 
     ? window.location.origin 
     : process.env.NEXT_PUBLIC_VERCEL_URL 
@@ -32,14 +32,10 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
   const tokenResponse = await fetch(`${baseUrl}/api/arduino/token`, {
     method: 'POST',
     headers: {
-      'content-type': 'application/x-www-form-urlencoded'
+      'content-type': 'application/x-www-form-urlencoded',
+      'accept': 'application/json'
     },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: clientId,
-      client_secret: clientSecret,
-      audience: 'https://api2.arduino.cc/iot'
-    }).toString()
+    body: `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&audience=https://api2.arduino.cc/iot`
   });
 
   const responseText = await tokenResponse.text();
@@ -84,7 +80,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       ...options,
       headers: {
         ...options.headers,
-        'Authorization': `Bearer ${access_token}`,
+        'authorization': `Bearer ${access_token}`,
         'content-type': 'application/json',
         'accept': 'application/json'
       }
