@@ -30,12 +30,22 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     throw new Error(`Failed to get access token: ${error.error || error.message || tokenResponse.statusText}`);
   }
 
-  const tokenData = await tokenResponse.json();
-  const access_token = tokenData.access_token;
+  let tokenData;
+  try {
+    tokenData = await tokenResponse.json();
+    console.log('Token response:', tokenData);
+  } catch (error) {
+    console.error('Failed to parse token response:', error);
+    throw new Error('Failed to parse token response');
+  }
 
-  if (!access_token) {
-    console.error('No access token in response:', tokenData);
-    throw new Error('No access token received from Arduino IoT Cloud');
+  // The token response includes eyJhbGciOiJIUzI1... format
+  const access_token = tokenData?.access_token;
+  console.log('Access token present:', !!access_token);
+
+  if (!access_token || typeof access_token !== 'string') {
+    console.error('Invalid token data:', tokenData);
+    throw new Error('No valid access token received from Arduino IoT Cloud');
   }
 
   const makeRequest = async (endpoint: string, options: RequestInit = {}) => {

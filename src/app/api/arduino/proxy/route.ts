@@ -88,13 +88,36 @@ async function handleRequest(request: NextRequest) {
     try {
       if (contentType?.includes('application/json')) {
         responseData = await response.json();
+        
+        // For token requests, verify the response format
+        if (isTokenRequest) {
+          console.log('Token response received:', {
+            hasToken: !!responseData?.access_token,
+            expiresIn: responseData?.expires_in,
+            tokenType: responseData?.token_type
+          });
+          
+          if (!responseData?.access_token) {
+            throw new Error('Invalid token response format');
+          }
+        }
       } else {
         responseData = await response.text();
       }
-      console.log('Response data:', responseData);
+      console.log('Response data type:', typeof responseData);
     } catch (error) {
       console.error('Error parsing response:', error);
-      responseData = { error: 'Failed to parse response' };
+      return NextResponse.json(
+        { 
+          error: 'Failed to parse response',
+          details: error.message,
+          url: url
+        },
+        { 
+          status: 500,
+          headers: corsHeaders
+        }
+      );
     }
 
     // Handle error responses
