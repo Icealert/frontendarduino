@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     // If deviceId is provided, fetch properties for that device
     if (deviceId) {
       console.log('Fetching properties for device:', deviceId);
-      const propertiesResponse = await fetch(`${ARDUINO_API_BASE}/v2/devices/${deviceId}/properties`, {
+      const propertiesResponse = await fetch(`${ARDUINO_API_BASE}/v2/devices/${deviceId}`, {
         headers: {
           'authorization': `Bearer ${tokenData.access_token}`,
           'content-type': 'application/json'
@@ -95,7 +95,43 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      return NextResponse.json({ properties: propertiesData }, {
+      // Get the thing ID from the device response
+      const thingId = propertiesData.thing?.id;
+      if (!thingId) {
+        return NextResponse.json(
+          { error: 'Device has no associated thing' },
+          { status: 404, headers: corsHeaders }
+        );
+      }
+
+      // Fetch the thing's properties
+      const thingResponse = await fetch(`${ARDUINO_API_BASE}/v1/things/${thingId}`, {
+        headers: {
+          'authorization': `Bearer ${tokenData.access_token}`,
+          'content-type': 'application/json'
+        }
+      });
+
+      const thingData = await thingResponse.json();
+      if (!thingResponse.ok) {
+        console.error('Failed to fetch thing properties:', {
+          status: thingResponse.status,
+          statusText: thingResponse.statusText,
+          error: thingData.error
+        });
+        return NextResponse.json(
+          { error: thingData.error || 'Failed to fetch thing properties' },
+          { status: thingResponse.status, headers: corsHeaders }
+        );
+      }
+
+      // Combine device and thing data
+      const deviceWithProperties = {
+        ...propertiesData,
+        thing: thingData
+      };
+
+      return NextResponse.json({ devices: [deviceWithProperties] }, {
         headers: {
           ...corsHeaders,
           'Cache-Control': 'no-store'
@@ -141,29 +177,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // For each device, fetch its properties
+    // For each device, fetch its thing data
     const devicesWithProperties = await Promise.all(
       devicesData.map(async (device: any) => {
         try {
-          const propertiesResponse = await fetch(`${ARDUINO_API_BASE}/v2/devices/${device.id}/properties`, {
+          if (!device.thing?.id) {
+            console.warn(`Device ${device.id} has no thing ID`);
+            return device;
+          }
+
+          const thingResponse = await fetch(`${ARDUINO_API_BASE}/v1/things/${device.thing.id}`, {
             headers: {
               'authorization': `Bearer ${tokenData.access_token}`,
               'content-type': 'application/json'
             }
           });
 
-          if (!propertiesResponse.ok) {
-            console.warn(`Failed to fetch properties for device ${device.id}:`, {
-              status: propertiesResponse.status,
-              statusText: propertiesResponse.statusText
+          if (!thingResponse.ok) {
+            console.warn(`Failed to fetch thing data for device ${device.id}:`, {
+              status: thingResponse.status,
+              statusText: thingResponse.statusText
             });
             return device;
           }
 
-          const properties = await propertiesResponse.json();
-          return { ...device, properties };
+          const thingData = await thingResponse.json();
+          return {
+            ...device,
+            thing: thingData
+          };
         } catch (error) {
-          console.warn(`Error fetching properties for device ${device.id}:`, error);
+          console.warn(`Error fetching thing data for device ${device.id}:`, error);
           return device;
         }
       })
