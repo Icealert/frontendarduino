@@ -6,64 +6,48 @@ export async function GET() {
     const clientId = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID;
     const clientSecret = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET;
 
-    console.log('Checking credentials...');
-    console.log('Client ID:', clientId?.substring(0, 5) + '...');
-    console.log('Client Secret:', clientSecret?.substring(0, 5) + '...');
-
     if (!clientId || !clientSecret) {
-      console.error('Missing Arduino IoT Cloud credentials');
-      return NextResponse.json({ 
-        error: 'Missing Arduino IoT Cloud credentials',
-        details: {
-          clientIdPresent: !!clientId,
-          clientSecretPresent: !!clientSecret
-        }
-      }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing Arduino IoT Cloud credentials' },
+        { status: 401 }
+      );
     }
 
-    console.log('Initializing Arduino IoT Cloud client...');
-    try {
-      const client = await createArduinoApiClient(clientId, clientSecret);
-      console.log('Client initialized successfully');
-      
-      console.log('Fetching devices...');
-      const devices = await client.getDevices();
-      console.log(`Found ${devices.length} devices:`, devices);
+    const client = await createArduinoApiClient(clientId, clientSecret);
+    const devices = await client.getDevices();
 
-      return NextResponse.json({ 
-        success: true,
-        devices,
-        meta: {
-          timestamp: new Date().toISOString(),
-          count: devices.length
-        }
-      });
-    } catch (clientError: any) {
-      console.error('Error creating Arduino client:', {
-        message: clientError.message,
-        stack: clientError.stack,
-        cause: clientError.cause
-      });
-      return NextResponse.json({ 
-        error: 'Failed to initialize Arduino client',
-        details: {
-          message: clientError.message,
-          cause: clientError.cause
-        }
-      }, { status: 500 });
-    }
-  } catch (error: any) {
-    console.error('Error in Arduino API route:', {
-      message: error.message,
-      stack: error.stack,
-      cause: error.cause
+    return new NextResponse(JSON.stringify(devices), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
     });
-    return NextResponse.json({
-      error: 'Failed to connect to Arduino IoT Cloud',
-      details: {
-        message: error.message,
-        cause: error.cause
+  } catch (error: any) {
+    console.error('Arduino API Error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch devices' },
+      { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
       }
-    }, { status: 500 });
+    );
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
 } 
