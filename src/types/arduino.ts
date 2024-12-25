@@ -187,4 +187,25 @@ export function groupProperties(properties: ArduinoProperty[]) {
     group,
     properties: properties.filter(p => propertyNames.includes(p.name))
   }));
+}
+
+export function getStepValue(propertyName: string): string {
+  switch (propertyName) {
+    case 'cloudtemp':
+    case 'tempThresholdMin':
+    case 'tempThresholdMax':
+      return '0.1'; // Temperature in 0.1°C steps
+    case 'cloudhumidity':
+    case 'humidityThresholdMin':
+    case 'humidityThresholdMax':
+      return '1'; // Humidity in 1% steps
+    case 'cloudflowrate':
+    case 'flowThresholdMin':
+      return '0.1'; // Flow rate in 0.1 L/min steps
+    case 'noFlowWarningTime':
+    case 'noFlowCriticalTime':
+      return '1'; // Time in 1 minute steps
+    default:
+      return 'any';
+  }
 } 
