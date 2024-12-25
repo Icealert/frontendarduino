@@ -28,6 +28,13 @@ export async function createArduinoApiClient(): Promise<ArduinoApiClient> {
     hasClientSecret: !!process.env.client_secret
   });
 
+  // OPTIONAL: Throw error if either credential is missing
+  if (!process.env.client_id || !process.env.client_secret) {
+    throw new Error(
+      'Missing credentials: client_id and client_secret are required in environment variables.'
+    );
+  }
+
   // Get access token through proxy endpoint
   const tokenResponse = await fetch(`${baseUrl}/api/arduino/proxy?endpoint=clients/token`, {
     method: 'POST',
