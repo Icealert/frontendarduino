@@ -3,38 +3,30 @@ import { createArduinoApiClient } from '@/api/arduinoApi';
 
 export async function POST(request: Request) {
   try {
-    const { deviceId, propertyName, value } = await request.json();
-
-    if (!deviceId || !propertyName || value === undefined) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
-
-    // Get credentials from environment variables
     const clientId = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID;
     const clientSecret = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
-      throw new Error('Missing Arduino IoT Cloud credentials');
+      console.error('Missing Arduino IoT Cloud credentials');
+      return NextResponse.json({ error: 'Missing Arduino IoT Cloud credentials' }, { status: 400 });
     }
 
-    console.log('Updating property:', { deviceId, propertyName, value });
+    const { deviceId, propertyId, value } = await request.json();
 
-    // Create API client with credentials
-    const api = createArduinoApiClient(clientId, clientSecret);
+    if (!deviceId || !propertyId) {
+      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+    }
 
-    // Update the property value
-    await api.updateProperty(deviceId, propertyName, value);
-
-    console.log('Property updated successfully');
+    console.log(`Updating property ${propertyId} for device ${deviceId} with value:`, value);
+    
+    const client = await createArduinoApiClient(clientId, clientSecret);
+    await client.updateProperty(deviceId, propertyId, value);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error updating property:', error);
+  } catch (error) {
+    console.error('Error in Arduino update API route:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to update property' },
+      { error: 'Failed to update property' },
       { status: 500 }
     );
   }

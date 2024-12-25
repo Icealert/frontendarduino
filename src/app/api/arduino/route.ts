@@ -1,119 +1,69 @@
 import { NextResponse } from 'next/server';
-import axios from 'axios';
-
-const API_BASE_URL = 'https://api2.arduino.cc/iot/v2';
-const AUTH_URL = 'https://api2.arduino.cc/iot/v1/clients/token';
-
-async function getAccessToken() {
-  const clientId = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID;
-  const clientSecret = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error('Missing Arduino credentials');
-  }
-
-  try {
-    // Create form data for authentication
-    const formData = new URLSearchParams();
-    formData.append('grant_type', 'client_credentials');
-    formData.append('client_id', clientId);
-    formData.append('client_secret', clientSecret);
-    formData.append('audience', 'https://api2.arduino.cc/iot');
-
-    const response = await axios.post(AUTH_URL, formData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
-
-    if (!response.data.access_token) {
-      throw new Error('No access token received');
-    }
-
-    return response.data.access_token;
-  } catch (error: any) {
-    console.error('Authentication error:', error.response?.data || error.message);
-    throw new Error('Failed to authenticate with Arduino IoT Cloud');
-  }
-}
-
-async function fetchDevices(accessToken: string) {
-  try {
-    // First get all things (devices)
-    const thingsResponse = await axios.get(`${API_BASE_URL}/things`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-    });
-
-    // For each thing, get its properties
-    const devices = await Promise.all(
-      thingsResponse.data.map(async (thing: any) => {
-        try {
-          const propertiesResponse = await axios.get(
-            `${API_BASE_URL}/things/${thing.id}/properties`,
-            {
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-              },
-            }
-          );
-
-          return {
-            id: thing.id,
-            name: thing.name,
-            status: thing.connection_status || 'OFFLINE',
-            properties: propertiesResponse.data.map((prop: any) => ({
-              id: prop.id,
-              name: prop.name,
-              value: prop.last_value,
-              type: prop.type,
-              timestamp: prop.value_updated_at
-            }))
-          };
-        } catch (error) {
-          console.error(`Error fetching properties for thing ${thing.id}:`, error);
-          return {
-            id: thing.id,
-            name: thing.name,
-            status: thing.connection_status || 'OFFLINE',
-            properties: []
-          };
-        }
-      })
-    );
-
-    return devices;
-  } catch (error: any) {
-    console.error('Error fetching devices:', error.response?.data || error.message);
-    throw new Error('Failed to fetch devices from Arduino IoT Cloud');
-  }
-}
+import { createArduinoApiClient } from '@/api/arduinoApi';
 
 export async function GET() {
   try {
-    // Get access token
-    const accessToken = await getAccessToken();
-    
-    // Fetch devices with their properties
-    const devices = await fetchDevices(accessToken);
+    const clientId = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID;
+    const clientSecret = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET;
 
-    return NextResponse.json({
-      devices,
-      meta: {
-        timestamp: new Date().toISOString(),
-        count: devices.length
-      }
-    });
+    console.log('Checking credentials...');
+    console.log('Client ID:', clientId?.substring(0, 5) + '...');
+    console.log('Client Secret:', clientSecret?.substring(0, 5) + '...');
 
+    if (!clientId || !clientSecret) {
+      console.error('Missing Arduino IoT Cloud credentials');
+      return NextResponse.json({ 
+        error: 'Missing Arduino IoT Cloud credentials',
+        details: {
+          clientIdPresent: !!clientId,
+          clientSecretPresent: !!clientSecret
+        }
+      }, { status: 400 });
+    }
+
+    console.log('Initializing Arduino IoT Cloud client...');
+    try {
+      const client = await createArduinoApiClient(clientId, clientSecret);
+      console.log('Client initialized successfully');
+      
+      console.log('Fetching devices...');
+      const devices = await client.getDevices();
+      console.log(`Found ${devices.length} devices:`, devices);
+
+      return NextResponse.json({ 
+        success: true,
+        devices,
+        meta: {
+          timestamp: new Date().toISOString(),
+          count: devices.length
+        }
+      });
+    } catch (clientError: any) {
+      console.error('Error creating Arduino client:', {
+        message: clientError.message,
+        stack: clientError.stack,
+        cause: clientError.cause
+      });
+      return NextResponse.json({ 
+        error: 'Failed to initialize Arduino client',
+        details: {
+          message: clientError.message,
+          cause: clientError.cause
+        }
+      }, { status: 500 });
+    }
   } catch (error: any) {
-    console.error('API error:', error);
-    return NextResponse.json(
-      { 
-        error: error.message || 'Internal server error',
-        timestamp: new Date().toISOString()
-      },
-      { status: 500 }
-    );
+    console.error('Error in Arduino API route:', {
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause
+    });
+    return NextResponse.json({
+      error: 'Failed to connect to Arduino IoT Cloud',
+      details: {
+        message: error.message,
+        cause: error.cause
+      }
+    }, { status: 500 });
   }
 } 

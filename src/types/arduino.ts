@@ -13,6 +13,21 @@ export interface ArduinoDevice {
   properties?: ArduinoProperty[];
 }
 
+export interface DeviceSettings {
+  temperatureRange: {
+    min: number;
+    max: number;
+  };
+  humidityRange: {
+    min: number;
+    max: number;
+  };
+  flowRateThreshold: number;
+  noFlowWarningTime: number;
+  noFlowCriticalTime: number;
+  alertEmail?: string;
+}
+
 export interface EditableValues {
   [key: string]: any;
 }

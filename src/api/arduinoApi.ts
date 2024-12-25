@@ -1,296 +1,184 @@
-import axios from 'axios';
+'use client';
+
 import { ArduinoDevice, ArduinoProperty, DeviceSettings } from '../types/arduino';
 
 const API_BASE_URL = 'https://api2.arduino.cc/iot/v2';
 const AUTH_URL = 'https://api2.arduino.cc/iot/v1/clients/token';
 
-// Create an Axios instance with default config
-const axiosInstance = axios.create({
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-class ArduinoApiClient {
-  private accessToken: string | null = null;
-  private clientId: string;
-  private clientSecret: string;
-  private knownDeviceIds: string[];
-
-  constructor(clientId: string, clientSecret: string, deviceIds: string[] = []) {
-    this.clientId = clientId;
-    this.clientSecret = clientSecret;
-    this.knownDeviceIds = deviceIds;
-    console.log('Initializing Arduino API Client...');
-    console.log('Known device IDs:', deviceIds);
-  }
-
-  private async authenticate() {
-    try {
-      console.log('Starting authentication...');
-      console.log('Client ID:', this.clientId);
-      console.log('Using auth URL:', AUTH_URL);
-
-      const formData = new URLSearchParams();
-      formData.append('grant_type', 'client_credentials');
-      formData.append('client_id', this.clientId);
-      formData.append('client_secret', this.clientSecret);
-      formData.append('audience', 'https://api2.arduino.cc/iot');
-
-      console.log('Sending authentication request...');
-      const response = await axios.post(AUTH_URL, formData.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        }
-      });
-
-      console.log('Authentication successful!');
-      this.accessToken = response.data.access_token;
-      return this.accessToken;
-    } catch (error: any) {
-      console.error('Authentication failed!');
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
-      throw new Error('Failed to authenticate with Arduino IoT Cloud');
-    }
-  }
-
-  private get headers() {
-    if (!this.accessToken) {
-      throw new Error('No access token available');
-    }
-    return {
-      'Authorization': `Bearer ${this.accessToken}`,
-      'Content-Type': 'application/json',
-    };
-  }
-
-  private async ensureAuthenticated() {
-    if (!this.accessToken) {
-      console.log('No access token found, authenticating...');
-      await this.authenticate();
-    }
-    return this.accessToken;
-  }
-
-  async getDevices(): Promise<ArduinoDevice[]> {
-    try {
-      console.log('Getting devices...');
-      await this.ensureAuthenticated();
-      
-      // If we have known device IDs, fetch them specifically
-      if (this.knownDeviceIds.length > 0) {
-        console.log('Fetching known devices:', this.knownDeviceIds);
-        const devices = await Promise.all(
-          this.knownDeviceIds.map(id => this.getDeviceById(id))
-        );
-        return devices.filter((device): device is ArduinoDevice => device !== null);
-      }
-      
-      // Otherwise, fetch all devices
-      const url = `${API_BASE_URL}/things`;
-      console.log('Fetching all devices from:', url);
-      
-      const response = await axiosInstance.get(url, {
-        headers: this.headers,
-        params: {
-          show_properties: true,
-        }
-      });
-
-      console.log('Devices response:', response.data);
-      
-      return Array.isArray(response.data) ? response.data.map((device: any) => ({
-        id: device.id,
-        name: device.name || 'Unnamed Device',
-        status: device.connection_status || 'offline',
-        lastSeen: device.last_activity_at || null,
-        properties: device.properties || []
-      })) : [];
-    } catch (error: any) {
-      console.error('Error fetching devices:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
-      return [];
-    }
-  }
-
-  private async getDeviceById(deviceId: string): Promise<ArduinoDevice | null> {
-    try {
-      await this.ensureAuthenticated();
-      const url = `${API_BASE_URL}/things/${deviceId}`;
-      console.log(`Fetching device ${deviceId} from:`, url);
-      
-      const response = await axiosInstance.get(url, {
-        headers: this.headers
-      });
-
-      const device = response.data;
-      return {
-        id: device.id,
-        name: device.name || 'Unnamed Device',
-        status: device.connection_status || 'offline',
-        lastSeen: device.last_activity_at || null,
-        properties: device.properties || []
-      };
-    } catch (error: any) {
-      console.error(`Error fetching device ${deviceId}:`, {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      return null;
-    }
-  }
-
-  async getDeviceProperties(deviceId: string): Promise<ArduinoProperty[]> {
-    try {
-      console.log(`Getting properties for device ${deviceId}...`);
-      await this.ensureAuthenticated();
-      
-      const url = `${API_BASE_URL}/things/${deviceId}/properties`;
-      console.log('Fetching properties from:', url);
-      
-      const response = await axiosInstance.get(url, { 
-        headers: this.headers,
-      });
-
-      console.log('Properties response:', response.data);
-      
-      return Array.isArray(response.data) ? response.data.map((prop: any) => ({
-        id: prop.id,
-        name: prop.name,
-        value: prop.last_value,
-        type: prop.variable_type,
-        unit: prop.unit,
-        timestamp: prop.updated_at
-      })) : [];
-    } catch (error: any) {
-      console.error('Error fetching device properties:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
-      return [];
-    }
-  }
-
-  async updateDeviceSettings(
-    deviceId: string,
-    propertyId: string,
-    settings: Partial<DeviceSettings>
-  ): Promise<void> {
-    try {
-      await this.ensureAuthenticated();
-      const url = `${API_BASE_URL}/things/${deviceId}/properties/${propertyId}`;
-      console.log('Updating settings at:', url);
-      
-      await axiosInstance.put(url, 
-        { value: settings },
-        { headers: this.headers }
-      );
-    } catch (error: any) {
-      console.error('Error updating device settings:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
-      throw error;
-    }
-  }
-
-  async getDeviceStatus(deviceId: string): Promise<'online' | 'offline'> {
-    try {
-      await this.ensureAuthenticated();
-      const url = `${API_BASE_URL}/things/${deviceId}`;
-      console.log('Fetching device status from:', url);
-      
-      const response = await axiosInstance.get(url, 
-        { headers: this.headers }
-      );
-      return response.data.connection_status || 'offline';
-    } catch (error: any) {
-      console.error('Error fetching device status:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
-      return 'offline';
-    }
-  }
-
-  async updateProperty(deviceId: string, propertyName: string, value: any): Promise<void> {
-    try {
-      await this.ensureAuthenticated();
-      
-      // First, get the properties to find the property ID
-      const properties = await this.getDeviceProperties(deviceId);
-      const property = properties.find(p => p.name === propertyName);
-      
-      if (!property) {
-        throw new Error(`Property ${propertyName} not found`);
-      }
-
-      console.log(`Updating property ${propertyName} (ID: ${property.id}) for device ${deviceId} with value:`, value);
-      
-      // Format the value based on the property type
-      let formattedValue = value;
-      if (propertyName === 'alertEmail') {
-        formattedValue = String(value); // Ensure email is sent as string
-      } else if (typeof value === 'number') {
-        formattedValue = Number(value); // Ensure numbers are sent as numbers
-      }
-
-      const url = `${API_BASE_URL}/things/${deviceId}/properties/${property.id}/publish`;
-      console.log('Sending update request to:', url);
-      console.log('Request payload:', { value: formattedValue });
-      
-      const response = await axiosInstance.put(
-        url,
-        { value: formattedValue },
-        { headers: this.headers }
-      );
-
-      if (response.status !== 200) {
-        throw new Error(`Failed to update property: ${response.statusText}`);
-      }
-
-      console.log('Property updated successfully:', response.data);
-    } catch (error: any) {
-      console.error('Error updating property:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
-      throw error;
-    }
-  }
+export interface ArduinoApiClient {
+  getDevices: () => Promise<ArduinoDevice[]>;
+  getDeviceProperties: (deviceId: string) => Promise<ArduinoProperty[]>;
+  updateProperty: (deviceId: string, propertyId: string, value: any) => Promise<void>;
+  getDeviceSettings: (deviceId: string) => Promise<DeviceSettings>;
+  updateDeviceSettings: (deviceId: string, settings: Partial<DeviceSettings>) => Promise<void>;
 }
 
-export const createArduinoApiClient = (clientId: string, clientSecret: string) => {
-  if (!clientId || !clientSecret) {
-    console.error('Missing credentials:', { clientId: !!clientId, clientSecret: !!clientSecret });
-    throw new Error('Missing Arduino IoT Cloud credentials');
+export async function createArduinoApiClient(clientId: string, clientSecret: string): Promise<ArduinoApiClient> {
+  console.log('Creating Arduino API client...');
+  
+  // Get access token
+  console.log('Requesting access token...');
+  const formData = new URLSearchParams();
+  formData.append('grant_type', 'client_credentials');
+  formData.append('client_id', clientId);
+  formData.append('client_secret', clientSecret);
+  formData.append('audience', 'https://api2.arduino.cc/iot');
+
+  const tokenResponse = await fetch(AUTH_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formData,
+  });
+
+  if (!tokenResponse.ok) {
+    const errorData = await tokenResponse.text();
+    console.error('Authentication failed:', {
+      status: tokenResponse.status,
+      statusText: tokenResponse.statusText,
+      error: errorData,
+      requestBody: Object.fromEntries(formData.entries())
+    });
+    throw new Error(`Failed to authenticate with Arduino IoT Cloud: ${tokenResponse.statusText}`);
   }
 
-  // Get device IDs from environment variables
-  const deviceIds = [
-    process.env.NEXT_PUBLIC_ARDUINO_DEVICE_ID_1,
-    process.env.NEXT_PUBLIC_ARDUINO_DEVICE_ID_2
-  ].filter((id): id is string => typeof id === 'string');
+  const tokenData = await tokenResponse.json();
+  if (!tokenData.access_token) {
+    console.error('No access token in response:', tokenData);
+    throw new Error('No access token received from Arduino IoT Cloud');
+  }
 
-  return new ArduinoApiClient(clientId, clientSecret, deviceIds);
-};
+  console.log('Successfully obtained access token');
 
-export type { ArduinoApiClient }; 
+  // Helper function to make authenticated requests
+  async function makeRequest(path: string, options: RequestInit = {}) {
+    const url = `${API_BASE_URL}${path}`;
+    console.log(`Making request to ${url}`);
+    
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('API request failed:', {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData
+      });
+      throw new Error(`Arduino API request failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  return {
+    async getDevices() {
+      console.log('Fetching devices...');
+      const data = await makeRequest('/things');
+      console.log('Raw devices data:', data);
+      
+      const devices = data.map((thing: any) => ({
+        id: thing.id,
+        name: thing.name,
+        status: thing.connection_status || 'OFFLINE',
+        properties: thing.properties || [],
+      }));
+      
+      console.log('Processed devices:', devices);
+      return devices;
+    },
+
+    async getDeviceProperties(deviceId: string) {
+      console.log(`Fetching properties for device ${deviceId}...`);
+      const data = await makeRequest(`/things/${deviceId}/properties`);
+      console.log(`Properties for device ${deviceId}:`, data);
+      return data;
+    },
+
+    async updateProperty(deviceId: string, propertyId: string, value: any) {
+      console.log(`Updating property ${propertyId} for device ${deviceId} with value:`, value);
+      await makeRequest(`/things/${deviceId}/properties/${propertyId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ value }),
+      });
+      console.log('Property updated successfully');
+    },
+
+    async getDeviceSettings(deviceId: string) {
+      console.log(`Fetching settings for device ${deviceId}...`);
+      const properties = await this.getDeviceProperties(deviceId);
+      
+      const settings = {
+        temperatureRange: {
+          min: properties.find(p => p.name === 'tempThresholdMin')?.value || 0,
+          max: properties.find(p => p.name === 'tempThresholdMax')?.value || 30,
+        },
+        humidityRange: {
+          min: properties.find(p => p.name === 'humidityThresholdMin')?.value || 0,
+          max: properties.find(p => p.name === 'humidityThresholdMax')?.value || 100,
+        },
+        flowRateThreshold: properties.find(p => p.name === 'flowThresholdMin')?.value || 0,
+        noFlowWarningTime: properties.find(p => p.name === 'noFlowWarningTime')?.value || 5,
+        noFlowCriticalTime: properties.find(p => p.name === 'noFlowCriticalTime')?.value || 10,
+        alertEmail: properties.find(p => p.name === 'alertEmail')?.value,
+      };
+      
+      console.log(`Settings for device ${deviceId}:`, settings);
+      return settings;
+    },
+
+    async updateDeviceSettings(deviceId: string, settings: Partial<DeviceSettings>) {
+      console.log(`Updating settings for device ${deviceId}:`, settings);
+      const updates = [];
+      
+      if (settings.temperatureRange) {
+        updates.push(
+          this.updateProperty(deviceId, 'tempThresholdMin', settings.temperatureRange.min),
+          this.updateProperty(deviceId, 'tempThresholdMax', settings.temperatureRange.max)
+        );
+      }
+      
+      if (settings.humidityRange) {
+        updates.push(
+          this.updateProperty(deviceId, 'humidityThresholdMin', settings.humidityRange.min),
+          this.updateProperty(deviceId, 'humidityThresholdMax', settings.humidityRange.max)
+        );
+      }
+      
+      if (settings.flowRateThreshold !== undefined) {
+        updates.push(
+          this.updateProperty(deviceId, 'flowThresholdMin', settings.flowRateThreshold)
+        );
+      }
+      
+      if (settings.noFlowWarningTime !== undefined) {
+        updates.push(
+          this.updateProperty(deviceId, 'noFlowWarningTime', settings.noFlowWarningTime)
+        );
+      }
+      
+      if (settings.noFlowCriticalTime !== undefined) {
+        updates.push(
+          this.updateProperty(deviceId, 'noFlowCriticalTime', settings.noFlowCriticalTime)
+        );
+      }
+      
+      if (settings.alertEmail !== undefined) {
+        updates.push(
+          this.updateProperty(deviceId, 'alertEmail', settings.alertEmail)
+        );
+      }
+      
+      await Promise.all(updates);
+      console.log('All settings updated successfully');
+    },
+  };
+} 
