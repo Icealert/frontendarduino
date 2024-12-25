@@ -49,7 +49,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     throw new Error('Failed to parse token response');
   }
 
-  if (!tokenData?.access_token || !tokenData?.token_type || tokenData?.token_type !== 'Bearer') {
+  if (!tokenData?.access_token) {
     console.error('Invalid token data:', JSON.stringify(tokenData, null, 2));
     throw new Error('Invalid token response format from Arduino IoT Cloud');
   }

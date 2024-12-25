@@ -60,9 +60,18 @@ async function handleRequest(request: NextRequest) {
       'Accept': 'application/json',
     };
 
-    // For token requests, use form-urlencoded content type
+    // For token requests, use form-urlencoded content type and specific headers
     if (isTokenRequest) {
       headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      // Parse the body to get client credentials
+      const formData = new URLSearchParams(body);
+      // Reconstruct the body exactly as specified in Arduino docs
+      body = new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: formData.get('client_id') || '',
+        client_secret: formData.get('client_secret') || '',
+        audience: 'https://api2.arduino.cc/iot'
+      }).toString();
     } else {
       headers['Content-Type'] = 'application/json';
       // Add Authorization header for non-token requests if present
@@ -73,6 +82,9 @@ async function handleRequest(request: NextRequest) {
     }
 
     console.log('Request headers:', headers);
+    if (isTokenRequest) {
+      console.log('Token request body:', body);
+    }
 
     // Forward the request to Arduino API
     const response = await fetch(url, {
@@ -91,20 +103,11 @@ async function handleRequest(request: NextRequest) {
         
         // For token requests, verify the response format
         if (isTokenRequest) {
-          console.log('Token response structure:', {
-            hasAccessToken: 'access_token' in responseData,
-            hasExpiresIn: 'expires_in' in responseData,
-            hasTokenType: 'token_type' in responseData,
+          console.log('Token response received:', {
+            hasToken: !!responseData?.access_token,
+            expiresIn: responseData?.expires_in,
             tokenType: responseData?.token_type
           });
-          
-          // Don't throw here, just log if something seems off
-          if (!responseData?.access_token || !responseData?.token_type || responseData?.token_type !== 'Bearer') {
-            console.warn('Unexpected token response format:', {
-              hasAccessToken: !!responseData?.access_token,
-              tokenType: responseData?.token_type
-            });
-          }
         }
       } else {
         responseData = await response.text();
