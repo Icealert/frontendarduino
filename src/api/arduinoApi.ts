@@ -19,12 +19,11 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     throw new Error('Client ID and Client Secret are required');
   }
 
-  // Get access token through our proxy API
-  const tokenResponse = await fetch('/api/arduino/proxy?endpoint=' + encodeURIComponent('clients/token'), {
+  // Get access token directly from Arduino API
+  const tokenResponse = await fetch('/api/arduino/token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Accept': 'application/json'
     },
     body: new URLSearchParams({
       grant_type: 'client_credentials',
@@ -67,7 +66,6 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
         ...options.headers,
         'Authorization': `Bearer ${access_token}`,
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
       }
     });
 
