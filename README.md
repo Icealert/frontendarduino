@@ -44,7 +44,7 @@ npm run dev
 
 ## Environment Variables
 
-- `NEXT_PUBLIC_ARDUINO_API_TOKEN`: Your Arduino IoT Cloud API token
+- `client_id`: Your Arduino IoT Cloud API token
 
 ## Available Scripts
 

@@ -3,8 +3,8 @@ import { createArduinoApiClient } from '@/api/arduinoApi';
 
 export async function GET() {
   try {
-    const clientId = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID;
-    const clientSecret = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET;
+    const clientId = process.env.client_id;
+    const clientSecret = process.env.client_secret;
 
     if (!clientId || !clientSecret) {
       console.error('Missing Arduino credentials');

@@ -15,15 +15,7 @@ export default function ClientDashboard() {
   useEffect(() => {
     async function initializeArduino() {
       try {
-        const clientId = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID;
-        const clientSecret = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET;
-
-        if (!clientId || !clientSecret) {
-          setError('Missing Arduino IoT Cloud credentials');
-          setIsLoading(false);
-          return;
-        }
-
+      
         const arduinoClient = await createArduinoApiClient();
         setClient(arduinoClient);
         setIsConnected(true);
@@ -100,15 +92,13 @@ export default function ClientDashboard() {
                 <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex justify-between">
                     <span>Client ID:</span>
-                    <span className={process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID ? 'text-teal-600' : 'text-rose-600'}>
-                      {process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID ? 'Present' : 'Missing'}
-                    </span>
+                    {/* Optional: remove or replace with server-based data if needed */}
+                    <span className="text-rose-600">Hidden (server-only)</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Client Secret:</span>
-                    <span className={process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET ? 'text-teal-600' : 'text-rose-600'}>
-                      {process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET ? 'Present' : 'Missing'}
-                    </span>
+                   {/* Optional: remove or replace with server-based data if needed */}
+                    <span className="text-rose-600">Hidden (server-only)</span>
                   </div>
                 </div>
               </div>
