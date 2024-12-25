@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createArduinoApiClient } from '@/api/arduinoApi';
+import { ArduinoProperty } from '@/types/arduino';
 
 export async function POST(request: Request) {
   try {
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     
     // Get the property ID first
     const properties = await client.getDeviceProperties(deviceId);
-    const property = properties.find(p => p.name === propertyName);
+    const property = properties.find((p: ArduinoProperty) => p.name === propertyName);
     
     if (!property) {
       return NextResponse.json({ error: `Property ${propertyName} not found` }, { status: 404 });
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
 
     // Verify the update by fetching the latest value
     const updatedProperties = await client.getDeviceProperties(deviceId);
-    const updatedProperty = updatedProperties.find(p => p.name === propertyName);
+    const updatedProperty = updatedProperties.find((p: ArduinoProperty) => p.name === propertyName);
 
     if (!updatedProperty || updatedProperty.value !== value) {
       throw new Error('Property update verification failed');
