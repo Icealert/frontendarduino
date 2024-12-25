@@ -1,46 +1,42 @@
 'use client';
 
-import React from 'react';
-import { Notification } from '../types/arduino';
+interface Notification {
+  id: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  message: string;
+  timestamp: Date;
+}
 
 interface NotificationAreaProps {
   notifications: Notification[];
-  onDismiss: (id: string) => void;
 }
 
-export function NotificationArea({ notifications, onDismiss }: NotificationAreaProps) {
+export default function NotificationArea({ notifications }: NotificationAreaProps) {
   if (notifications.length === 0) {
-    return null;
+    return (
+      <div className="p-4 text-slate-300">
+        No notifications
+      </div>
+    );
   }
 
   return (
-    <div className="fixed bottom-4 right-4 space-y-2 max-w-md w-full">
+    <div className="space-y-4">
       {notifications.map((notification) => (
         <div
           key={notification.id}
           className={`p-4 rounded-lg shadow-lg ${
-            notification.type === 'error'
-              ? 'bg-red-50 text-red-800'
-              : notification.type === 'warning'
-              ? 'bg-yellow-50 text-yellow-800'
-              : notification.type === 'success'
-              ? 'bg-green-50 text-green-800'
-              : 'bg-blue-50 text-blue-800'
+            notification.type === 'success' ? 'bg-teal-800/50 text-teal-100' :
+            notification.type === 'error' ? 'bg-rose-800/50 text-rose-100' :
+            notification.type === 'warning' ? 'bg-amber-800/50 text-amber-100' :
+            'bg-slate-800/50 text-slate-100'
           }`}
         >
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="font-medium">{notification.message}</p>
-              <p className="text-sm mt-1 opacity-75">
-                {new Date(notification.timestamp).toLocaleString()}
-              </p>
-            </div>
-            <button
-              onClick={() => onDismiss(notification.id)}
-              className="ml-4 text-sm font-medium opacity-75 hover:opacity-100"
-            >
-              Dismiss
-            </button>
+          <div className="flex items-center justify-between">
+            <p>{notification.message}</p>
+            <span className="text-sm opacity-75">
+              {notification.timestamp.toLocaleTimeString()}
+            </span>
           </div>
         </div>
       ))}
