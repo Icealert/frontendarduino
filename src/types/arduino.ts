@@ -24,6 +24,7 @@ export interface ArduinoProperty {
   update_parameter: number;
   permission: string;
   variable_name: string;
+  updated_at: string;
 }
 
 export interface DeviceSettings {

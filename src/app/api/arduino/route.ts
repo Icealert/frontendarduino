@@ -55,80 +55,56 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const deviceId = searchParams.get('deviceId');
 
-    // If deviceId is provided, fetch properties for that device
+    // If deviceId is provided, fetch that specific device and its properties
     if (deviceId) {
-      console.log('Fetching properties for device:', deviceId);
-      const propertiesResponse = await fetch(`${ARDUINO_API_BASE}/v2/devices/${deviceId}`, {
+      console.log('Fetching device and properties for:', deviceId);
+      
+      // First, get the device details
+      const deviceResponse = await fetch(`${ARDUINO_API_BASE}/v2/devices/${deviceId}`, {
         headers: {
           'authorization': `Bearer ${tokenData.access_token}`,
           'content-type': 'application/json'
         }
       });
 
-      const propertiesText = await propertiesResponse.text();
-      console.log('Properties response:', {
-        status: propertiesResponse.status,
-        statusText: propertiesResponse.statusText,
-        responseLength: propertiesText.length
-      });
-
-      let propertiesData;
-      try {
-        propertiesData = JSON.parse(propertiesText);
-      } catch (error) {
-        console.error('Failed to parse properties response:', error);
+      if (!deviceResponse.ok) {
+        console.error('Failed to fetch device:', {
+          status: deviceResponse.status,
+          statusText: deviceResponse.statusText
+        });
         return NextResponse.json(
-          { error: 'Invalid response from Arduino IoT Cloud when fetching properties' },
-          { status: 500, headers: corsHeaders }
+          { error: 'Failed to fetch device details' },
+          { status: deviceResponse.status, headers: corsHeaders }
         );
       }
 
+      const deviceData = await deviceResponse.json();
+
+      // Then, get the device's properties
+      const propertiesResponse = await fetch(`${ARDUINO_API_BASE}/v2/devices/${deviceId}/properties`, {
+        headers: {
+          'authorization': `Bearer ${tokenData.access_token}`,
+          'content-type': 'application/json'
+        }
+      });
+
       if (!propertiesResponse.ok) {
-        console.error('Failed to fetch device properties:', {
+        console.error('Failed to fetch properties:', {
           status: propertiesResponse.status,
-          statusText: propertiesResponse.statusText,
-          error: propertiesData.error
+          statusText: propertiesResponse.statusText
         });
         return NextResponse.json(
-          { error: propertiesData.error || 'Failed to fetch device properties' },
+          { error: 'Failed to fetch device properties' },
           { status: propertiesResponse.status, headers: corsHeaders }
         );
       }
 
-      // Get the thing ID from the device response
-      const thingId = propertiesData.thing?.id;
-      if (!thingId) {
-        return NextResponse.json(
-          { error: 'Device has no associated thing' },
-          { status: 404, headers: corsHeaders }
-        );
-      }
+      const propertiesData = await propertiesResponse.json();
 
-      // Fetch the thing's properties
-      const thingResponse = await fetch(`${ARDUINO_API_BASE}/v1/things/${thingId}`, {
-        headers: {
-          'authorization': `Bearer ${tokenData.access_token}`,
-          'content-type': 'application/json'
-        }
-      });
-
-      const thingData = await thingResponse.json();
-      if (!thingResponse.ok) {
-        console.error('Failed to fetch thing properties:', {
-          status: thingResponse.status,
-          statusText: thingResponse.statusText,
-          error: thingData.error
-        });
-        return NextResponse.json(
-          { error: thingData.error || 'Failed to fetch thing properties' },
-          { status: thingResponse.status, headers: corsHeaders }
-        );
-      }
-
-      // Combine device and thing data
+      // Combine device data with its properties
       const deviceWithProperties = {
-        ...propertiesData,
-        thing: thingData
+        ...deviceData,
+        properties: propertiesData
       };
 
       return NextResponse.json({ devices: [deviceWithProperties] }, {
@@ -147,67 +123,45 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const devicesText = await devicesResponse.text();
-    console.log('Devices response:', {
-      status: devicesResponse.status,
-      statusText: devicesResponse.statusText,
-      responseLength: devicesText.length
-    });
-
-    let devicesData;
-    try {
-      devicesData = JSON.parse(devicesText);
-    } catch (error) {
-      console.error('Failed to parse devices response:', error);
-      return NextResponse.json(
-        { error: 'Invalid response from Arduino IoT Cloud when fetching devices' },
-        { status: 500, headers: corsHeaders }
-      );
-    }
-
     if (!devicesResponse.ok) {
       console.error('Failed to fetch devices:', {
         status: devicesResponse.status,
-        statusText: devicesResponse.statusText,
-        error: devicesData.error
+        statusText: devicesResponse.statusText
       });
       return NextResponse.json(
-        { error: devicesData.error || 'Failed to fetch devices' },
+        { error: 'Failed to fetch devices' },
         { status: devicesResponse.status, headers: corsHeaders }
       );
     }
 
-    // For each device, fetch its thing data
+    const devicesData = await devicesResponse.json();
+
+    // For each device, fetch its properties
     const devicesWithProperties = await Promise.all(
       devicesData.map(async (device: any) => {
         try {
-          if (!device.thing?.id) {
-            console.warn(`Device ${device.id} has no thing ID`);
-            return device;
-          }
-
-          const thingResponse = await fetch(`${ARDUINO_API_BASE}/v1/things/${device.thing.id}`, {
+          const propertiesResponse = await fetch(`${ARDUINO_API_BASE}/v2/devices/${device.id}/properties`, {
             headers: {
               'authorization': `Bearer ${tokenData.access_token}`,
               'content-type': 'application/json'
             }
           });
 
-          if (!thingResponse.ok) {
-            console.warn(`Failed to fetch thing data for device ${device.id}:`, {
-              status: thingResponse.status,
-              statusText: thingResponse.statusText
+          if (!propertiesResponse.ok) {
+            console.warn(`Failed to fetch properties for device ${device.id}:`, {
+              status: propertiesResponse.status,
+              statusText: propertiesResponse.statusText
             });
             return device;
           }
 
-          const thingData = await thingResponse.json();
+          const propertiesData = await propertiesResponse.json();
           return {
             ...device,
-            thing: thingData
+            properties: propertiesData
           };
         } catch (error) {
-          console.warn(`Error fetching thing data for device ${device.id}:`, error);
+          console.warn(`Error fetching properties for device ${device.id}:`, error);
           return device;
         }
       })

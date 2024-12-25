@@ -1,6 +1,6 @@
 'use client';
 
-import { ArduinoDevice } from '../types/arduino';
+import { ArduinoDevice, ArduinoProperty, formatValue } from '../types/arduino';
 
 interface DeviceDetailsProps {
   device: ArduinoDevice | null;
@@ -29,6 +29,28 @@ export default function DeviceDetails({ device }: DeviceDetailsProps) {
           <span className="text-slate-300">Device ID</span>
           <span className="text-slate-400">{device.id}</span>
         </div>
+
+        {device.properties && device.properties.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold text-slate-200 mb-3">Properties</h3>
+            <div className="space-y-3">
+              {device.properties.map((property: ArduinoProperty) => (
+                <div key={property.id} className="flex items-center justify-between">
+                  <span className="text-slate-300">{property.name}</span>
+                  <span className="text-slate-400">
+                    {formatValue(property.name, property.value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {device.properties?.[0]?.updated_at && (
+          <div className="mt-4 text-sm text-slate-400">
+            Last updated: {new Date(device.properties[0].updated_at).toLocaleString()}
+          </div>
+        )}
       </div>
     </div>
   );
