@@ -6,6 +6,7 @@ export interface ArduinoDevice {
   fqbn?: string;
   events?: any[];
   properties?: ArduinoProperty[];
+  status: 'ONLINE' | 'OFFLINE';
 }
 
 export interface ArduinoProperty {
