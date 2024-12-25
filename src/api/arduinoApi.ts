@@ -32,8 +32,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
   const tokenResponse = await fetch(`${baseUrl}/api/arduino/token`, {
     method: 'POST',
     headers: {
-      'content-type': 'application/x-www-form-urlencoded',
-      'accept': 'application/json'
+      'content-type': 'application/x-www-form-urlencoded'
     },
     body: `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&audience=https://api2.arduino.cc/iot`
   });
@@ -81,8 +80,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       headers: {
         ...options.headers,
         'authorization': `Bearer ${access_token}`,
-        'content-type': 'application/json',
-        'accept': 'application/json'
+        'content-type': 'application/json'
       }
     });
 
@@ -114,7 +112,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
 
   const client: ArduinoApiClient = {
     async getDevices() {
-      const devices = await makeRequest('devices') as Promise<Omit<ArduinoDevice, 'status'>[]>;
+      const devices = await makeRequest('v2/devices') as Promise<Omit<ArduinoDevice, 'status'>[]>;
       const devicesArray = await devices;
       
       return devicesArray.map(device => ({
@@ -124,7 +122,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     },
 
     async getDeviceProperties(deviceId: string) {
-      return makeRequest(`devices/${deviceId}/properties`) as Promise<ArduinoProperty[]>;
+      return makeRequest(`v2/devices/${deviceId}/properties`) as Promise<ArduinoProperty[]>;
     },
 
     async getDeviceSettings(deviceId: string) {
@@ -168,7 +166,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     },
 
     async updateProperty(deviceId: string, propertyId: string, value: any) {
-      await makeRequest(`devices/${deviceId}/properties/${propertyId}/publish`, {
+      await makeRequest(`v2/devices/${deviceId}/properties/${propertyId}/publish`, {
         method: 'PUT',
         body: JSON.stringify({ value })
       });

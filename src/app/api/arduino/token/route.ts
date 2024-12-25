@@ -7,7 +7,7 @@ const ARDUINO_API_BASE = 'https://api2.arduino.cc/iot';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
 export async function POST(request: NextRequest) {
@@ -43,12 +43,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Make request to Arduino IoT Cloud API exactly as per docs
-    const response = await fetch('https://api2.arduino.cc/iot/v1/clients/token', {
+    // Make request to Arduino IoT Cloud API
+    const response = await fetch(`${ARDUINO_API_BASE}/v1/clients/token`, {
       method: 'POST',
       headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-        'accept': 'application/json'
+        'content-type': 'application/x-www-form-urlencoded'
       },
       body: `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&audience=https://api2.arduino.cc/iot`
     });
