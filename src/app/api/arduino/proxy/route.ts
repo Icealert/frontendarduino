@@ -91,14 +91,19 @@ async function handleRequest(request: NextRequest) {
         
         // For token requests, verify the response format
         if (isTokenRequest) {
-          console.log('Token response received:', {
-            hasToken: !!responseData?.access_token,
-            expiresIn: responseData?.expires_in,
+          console.log('Token response structure:', {
+            hasAccessToken: 'access_token' in responseData,
+            hasExpiresIn: 'expires_in' in responseData,
+            hasTokenType: 'token_type' in responseData,
             tokenType: responseData?.token_type
           });
           
-          if (!responseData?.access_token) {
-            throw new Error('Invalid token response format');
+          // Don't throw here, just log if something seems off
+          if (!responseData?.access_token || !responseData?.token_type || responseData?.token_type !== 'Bearer') {
+            console.warn('Unexpected token response format:', {
+              hasAccessToken: !!responseData?.access_token,
+              tokenType: responseData?.token_type
+            });
           }
         }
       } else {

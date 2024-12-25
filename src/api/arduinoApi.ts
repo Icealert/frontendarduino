@@ -8,6 +8,12 @@ export interface ArduinoApiClient {
   updateDeviceSettings(deviceId: string, settings: Partial<DeviceSettings>): Promise<void>;
 }
 
+interface TokenResponse {
+  access_token: string;
+  expires_in: number;
+  token_type: string;
+}
+
 export async function createArduinoApiClient(clientId: string, clientSecret: string): Promise<ArduinoApiClient> {
   // Get access token through our proxy API
   const tokenResponse = await fetch('/api/arduino/proxy?endpoint=' + encodeURIComponent('clients/token'), {
@@ -30,23 +36,26 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     throw new Error(`Failed to get access token: ${error.error || error.message || tokenResponse.statusText}`);
   }
 
-  let tokenData;
+  let tokenData: TokenResponse;
   try {
     tokenData = await tokenResponse.json();
-    console.log('Token response:', tokenData);
+    console.log('Token response received:', {
+      hasToken: !!tokenData?.access_token,
+      expiresIn: tokenData?.expires_in,
+      tokenType: tokenData?.token_type
+    });
   } catch (error) {
     console.error('Failed to parse token response:', error);
     throw new Error('Failed to parse token response');
   }
 
-  // The token response includes eyJhbGciOiJIUzI1... format
-  const access_token = tokenData?.access_token;
-  console.log('Access token present:', !!access_token);
-
-  if (!access_token || typeof access_token !== 'string') {
-    console.error('Invalid token data:', tokenData);
-    throw new Error('No valid access token received from Arduino IoT Cloud');
+  if (!tokenData?.access_token || !tokenData?.token_type || tokenData?.token_type !== 'Bearer') {
+    console.error('Invalid token data:', JSON.stringify(tokenData, null, 2));
+    throw new Error('Invalid token response format from Arduino IoT Cloud');
   }
+
+  const access_token = tokenData.access_token;
+  console.log('Access token obtained successfully');
 
   const makeRequest = async (endpoint: string, options: RequestInit = {}) => {
     const url = '/api/arduino/proxy?endpoint=' + encodeURIComponent(endpoint);
