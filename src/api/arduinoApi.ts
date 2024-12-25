@@ -10,7 +10,7 @@ export interface ArduinoApiClient {
 
 export async function createArduinoApiClient(clientId: string, clientSecret: string): Promise<ArduinoApiClient> {
   // Get access token through our proxy API
-  const tokenResponse = await fetch('/api/arduino/proxy?endpoint=clients/token', {
+  const tokenResponse = await fetch('/api/arduino/proxy?endpoint=' + encodeURIComponent('clients/token'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -25,15 +25,24 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
   });
 
   if (!tokenResponse.ok) {
-    const error = await tokenResponse.json();
+    const error = await tokenResponse.json().catch(() => ({ error: tokenResponse.statusText }));
+    console.error('Token response error:', error);
     throw new Error(`Failed to get access token: ${error.error || error.message || tokenResponse.statusText}`);
   }
 
-  const { access_token } = await tokenResponse.json();
+  const tokenData = await tokenResponse.json();
+  const access_token = tokenData.access_token;
+
+  if (!access_token) {
+    console.error('No access token in response:', tokenData);
+    throw new Error('No access token received from Arduino IoT Cloud');
+  }
 
   const makeRequest = async (endpoint: string, options: RequestInit = {}) => {
-    // Use our serverless proxy for all Arduino API requests
-    const response = await fetch(`/api/arduino/proxy?endpoint=${encodeURIComponent(endpoint)}`, {
+    const url = '/api/arduino/proxy?endpoint=' + encodeURIComponent(endpoint);
+    console.log('Making request to:', url);
+
+    const response = await fetch(url, {
       ...options,
       headers: {
         ...options.headers,
@@ -43,8 +52,9 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`API request failed: ${error.error || response.statusText}`);
+      const error = await response.json().catch(() => ({ error: response.statusText }));
+      console.error('API request error:', error);
+      throw new Error(`API request failed: ${error.error || error.message || response.statusText}`);
     }
 
     return response.json();
@@ -74,7 +84,6 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
         settings[key] = prop.value;
       });
 
-      // Return settings with proper type validation and defaults
       return {
         alertEmail: validateValue('alertEmail', settings.alertEmail) ? settings.alertEmail : getDefaultValue('alertEmail'),
         cloudflowrate: validateValue('cloudflowrate', settings.cloudflowrate) ? settings.cloudflowrate : getDefaultValue('cloudflowrate'),
@@ -95,7 +104,6 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       const properties = await this.getDeviceProperties(deviceId);
       
       for (const [key, value] of Object.entries(settings)) {
-        // Validate value before updating
         if (!validateValue(key, value)) {
           throw new Error(`Invalid value for ${key}: ${value}`);
         }
