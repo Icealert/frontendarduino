@@ -1,60 +1,71 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArduinoApiClient } from '../api/arduinoApi';
-import { ArduinoDevice, DeviceSettings } from '../types/arduino';
+import { ArduinoApiClient, ArduinoDevice, DeviceSettings } from '@/types/arduino';
 
-export const useArduinoDevices = (client: ArduinoApiClient) => {
+export function useArduinoDevices(client: ArduinoApiClient | null) {
   const queryClient = useQueryClient();
 
-  // Fetch all devices
-  const {
-    data: devices,
-    isLoading: isLoadingDevices,
-    error: devicesError,
-  } = useQuery<ArduinoDevice[]>(['devices'], () => client.getDevices());
+  const devicesQuery = useQuery({
+    queryKey: ['devices'],
+    queryFn: () => client?.getDevices() ?? Promise.resolve([]),
+    enabled: !!client,
+  });
 
-  // Fetch device properties
-  const useDeviceProperties = (deviceId: string) => {
-    return useQuery(['deviceProperties', deviceId], () =>
-      client.getDeviceProperties(deviceId)
-    );
-  };
+  const devicePropertiesQuery = useQuery({
+    queryKey: ['deviceProperties', devicesQuery.data?.[0]?.id],
+    queryFn: () => 
+      devicesQuery.data?.[0]?.id 
+        ? client?.getDeviceProperties(devicesQuery.data[0].id) 
+        : Promise.resolve([]),
+    enabled: !!client && !!devicesQuery.data?.[0]?.id,
+  });
 
-  // Update device settings
-  const useUpdateDeviceSettings = () => {
-    return useMutation(
-      ({
-        deviceId,
-        propertyId,
-        settings,
-      }: {
-        deviceId: string;
-        propertyId: string;
-        settings: Partial<DeviceSettings>;
-      }) => client.updateDeviceSettings(deviceId, propertyId, settings),
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries(['deviceProperties']);
-        },
-      }
-    );
-  };
+  const deviceSettingsQuery = useQuery({
+    queryKey: ['deviceSettings', devicesQuery.data?.[0]?.id],
+    queryFn: () => 
+      devicesQuery.data?.[0]?.id 
+        ? client?.getDeviceSettings(devicesQuery.data[0].id)
+        : Promise.resolve(null),
+    enabled: !!client && !!devicesQuery.data?.[0]?.id,
+  });
 
-  // Get device status
-  const useDeviceStatus = (deviceId: string) => {
-    return useQuery(['deviceStatus', deviceId], () =>
-      client.getDeviceStatus(deviceId),
-      {
-        refetchInterval: 30000, // Refetch every 30 seconds
-      }
-    );
-  };
+  const updateDeviceSettingsMutation = useMutation({
+    mutationFn: ({ 
+      deviceId, 
+      settings 
+    }: { 
+      deviceId: string;
+      settings: Partial<DeviceSettings>;
+    }) => client?.updateDeviceSettings(deviceId, settings) ?? Promise.resolve(),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['deviceProperties']);
+      queryClient.invalidateQueries(['deviceSettings']);
+    },
+  });
+
+  const updatePropertyMutation = useMutation({
+    mutationFn: ({ 
+      deviceId, 
+      propertyId, 
+      value 
+    }: { 
+      deviceId: string;
+      propertyId: string;
+      value: any;
+    }) => client?.updateProperty(deviceId, propertyId, value) ?? Promise.resolve(),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['deviceProperties']);
+      queryClient.invalidateQueries(['deviceSettings']);
+    },
+  });
 
   return {
-    devices,
-    isLoadingDevices,
-    devicesError,
-    useDeviceProperties,
-    useUpdateDeviceSettings,
-    useDeviceStatus,
+    devices: devicesQuery.data ?? [],
+    deviceProperties: devicePropertiesQuery.data ?? [],
+    deviceSettings: deviceSettingsQuery.data,
+    isLoading: devicesQuery.isLoading || devicePropertiesQuery.isLoading || deviceSettingsQuery.isLoading,
+    isError: devicesQuery.isError || devicePropertiesQuery.isError || deviceSettingsQuery.isError,
+    error: devicesQuery.error || devicePropertiesQuery.error || deviceSettingsQuery.error,
+    updateDeviceSettings: updateDeviceSettingsMutation.mutate,
+    updateProperty: updatePropertyMutation.mutate,
   };
-}; 
+} 
