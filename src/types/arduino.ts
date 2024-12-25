@@ -1,3 +1,9 @@
+export interface ArduinoEvent {
+  name: string;
+  value: string;
+  updated_at: string;
+}
+
 export interface ArduinoProperty {
   id: string;
   name: string;
@@ -38,6 +44,7 @@ export interface ArduinoDevice {
   user_id: string;
   ota_compatible?: boolean;
   ota_available?: boolean;
+  events?: ArduinoEvent[];
 }
 
 export interface DeviceSettings {

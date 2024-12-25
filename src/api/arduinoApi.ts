@@ -126,7 +126,9 @@ export async function createArduinoApiClient(): Promise<ArduinoApiClient> {
       
       return devicesArray.map(device => ({
         ...device,
-        status: device.events?.some(e => e.type === 'DEVICE_ONLINE') ? 'ONLINE' as const : 'OFFLINE' as const
+        status: device.events?.some(e => e.name === 'r_status' && e.value === 'CONNECTED') 
+          ? 'ONLINE' as const 
+          : 'OFFLINE' as const
       }));
     },
 
