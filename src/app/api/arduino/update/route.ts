@@ -22,29 +22,48 @@ export async function POST(request: Request) {
     
     const client = await createArduinoApiClient(clientId, clientSecret);
     
-    // Get the property ID first
-    const properties = await client.getDeviceProperties(deviceId);
-    const property = properties.find((p: ArduinoProperty) => p.name === propertyName);
-    
-    if (!property) {
-      return NextResponse.json({ error: `Property ${propertyName} not found` }, { status: 404 });
+    try {
+      // Get the property ID first
+      const properties = await client.getDeviceProperties(deviceId);
+      const property = properties.find((p: ArduinoProperty) => p.name === propertyName);
+      
+      if (!property) {
+        console.error(`Property ${propertyName} not found`);
+        return NextResponse.json({ error: `Property ${propertyName} not found` }, { status: 404 });
+      }
+
+      console.log(`Found property ${propertyName} with ID ${property.id}`);
+
+      // Convert value to the correct type based on the property type
+      let typedValue = value;
+      if (property.type === 'FLOAT' || property.type === 'NUMBER') {
+        typedValue = parseFloat(value);
+      } else if (property.type === 'INTEGER') {
+        typedValue = parseInt(value, 10);
+      }
+
+      // Update the property with the new value
+      await client.updateProperty(deviceId, property.id, typedValue);
+      console.log(`Successfully updated property ${propertyName} to value:`, typedValue);
+
+      // Verify the update by fetching the latest value
+      const updatedProperties = await client.getDeviceProperties(deviceId);
+      const updatedProperty = updatedProperties.find((p: ArduinoProperty) => p.name === propertyName);
+
+      if (!updatedProperty) {
+        throw new Error(`Could not verify update for property ${propertyName}`);
+      }
+
+      return NextResponse.json({ 
+        success: true,
+        property: updatedProperty
+      });
+    } catch (updateError) {
+      console.error('Error updating property:', updateError);
+      return NextResponse.json({ 
+        error: `Failed to update property: ${updateError.message}` 
+      }, { status: 500 });
     }
-
-    // Update the property with the new value
-    await client.updateProperty(deviceId, property.id, value);
-
-    // Verify the update by fetching the latest value
-    const updatedProperties = await client.getDeviceProperties(deviceId);
-    const updatedProperty = updatedProperties.find((p: ArduinoProperty) => p.name === propertyName);
-
-    if (!updatedProperty || updatedProperty.value !== value) {
-      throw new Error('Property update verification failed');
-    }
-
-    return NextResponse.json({ 
-      success: true,
-      property: updatedProperty
-    });
   } catch (error) {
     console.error('Error in Arduino update API route:', error);
     return NextResponse.json(
