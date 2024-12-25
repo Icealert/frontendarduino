@@ -1,9 +1,10 @@
-import { ArduinoDevice, ArduinoProperty } from '@/types/arduino';
+import { ArduinoDevice, ArduinoProperty, DeviceSettings } from '@/types/arduino';
 
 export interface ArduinoApiClient {
   getDevices(): Promise<ArduinoDevice[]>;
   getDeviceProperties(deviceId: string): Promise<ArduinoProperty[]>;
   updateProperty(deviceId: string, propertyId: string, value: any): Promise<void>;
+  getDeviceSettings(deviceId: string): Promise<DeviceSettings>;
 }
 
 export async function createArduinoApiClient(clientId: string, clientSecret: string): Promise<ArduinoApiClient> {
@@ -53,6 +54,27 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       }
 
       return response.json();
+    },
+
+    async getDeviceSettings(deviceId: string): Promise<DeviceSettings> {
+      const response = await fetch(`https://api2.arduino.cc/iot/v2/devices/${deviceId}`, {
+        headers: {
+          'Authorization': `Bearer ${access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get device settings: ${response.statusText}`);
+      }
+
+      const device = await response.json();
+      return {
+        name: device.name,
+        timezone: device.timezone || '',
+        template: device.template || '',
+        serial: device.serial || '',
+        type: device.type || ''
+      };
     },
 
     async updateProperty(deviceId: string, propertyId: string, value: any): Promise<void> {
