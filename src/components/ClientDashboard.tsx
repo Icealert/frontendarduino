@@ -24,7 +24,7 @@ export default function ClientDashboard() {
           return;
         }
 
-        const arduinoClient = await createArduinoApiClient(clientId, clientSecret);
+        const arduinoClient = await createArduinoApiClient();
         setClient(arduinoClient);
         setIsConnected(true);
         setError(null);
