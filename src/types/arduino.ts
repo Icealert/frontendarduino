@@ -1,50 +1,29 @@
-export interface ArduinoEvent {
+export interface ArduinoDevice {
+  id: string;
   name: string;
-  value: string;
-  updated_at: string;
+  type?: string;
+  serial?: string;
+  fqbn?: string;
+  events?: any[];
+  properties?: ArduinoProperty[];
+  device_status: 'ONLINE' | 'OFFLINE';
+  thing?: {
+    id: string;
+    name: string;
+    properties?: ArduinoProperty[];
+  };
 }
 
 export interface ArduinoProperty {
   id: string;
   name: string;
   type: string;
-  permission: string;
-  value?: any;
-  last_value?: any;
-  variable_name: string;
+  value: any;
+  persist: boolean;
   update_strategy: string;
   update_parameter: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ArduinoThing {
-  id: string;
-  name: string;
-  properties: ArduinoProperty[];
-  properties_count: number;
-  created_at: string;
-  updated_at: string;
-  timezone: string;
-  device_id: string;
-  device_name: string;
-}
-
-export interface ArduinoDevice {
-  id: string;
-  name: string;
-  type: string;
-  fqbn?: string;
-  status: 'ONLINE' | 'OFFLINE';
-  serial?: string;
-  label?: string;
-  last_activity_at?: string;
-  created_at: string;
-  thing?: ArduinoThing;
-  user_id: string;
-  ota_compatible?: boolean;
-  ota_available?: boolean;
-  events?: ArduinoEvent[];
+  permission: string;
+  variable_name: string;
 }
 
 export interface DeviceSettings {

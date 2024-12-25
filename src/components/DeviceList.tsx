@@ -42,9 +42,9 @@ export default function DeviceList({ devices, selectedDevice, onDeviceSelect }: 
             <div>
               <h3 className="text-lg font-semibold text-slate-100">{device.name}</h3>
               <div className="flex items-center space-x-2 mt-1">
-                <div className={`h-2.5 w-2.5 rounded-full ${device.status === 'ONLINE' ? 'bg-teal-500' : 'bg-rose-500'}`}></div>
-                <p className={`text-sm ${device.status === 'ONLINE' ? 'text-teal-300' : 'text-rose-300'}`}>
-                  {device.status}
+                <div className={`h-2.5 w-2.5 rounded-full ${device.device_status === 'ONLINE' ? 'bg-teal-500' : 'bg-rose-500'}`}></div>
+                <p className={`text-sm ${device.device_status === 'ONLINE' ? 'text-teal-300' : 'text-rose-300'}`}>
+                  {device.device_status}
                 </p>
               </div>
             </div>
