@@ -21,6 +21,21 @@ export interface ArduinoProperty {
   permission?: string;
 }
 
+export interface DeviceSettings {
+  alertEmail: string;
+  cloudflowrate: number;
+  cloudhumidity: number;
+  cloudtemp: number;
+  flowThresholdMin: number;
+  humidityThresholdMax: number;
+  humidityThresholdMin: number;
+  lastUpdateTime: string;
+  noFlowCriticalTime: number;
+  noFlowWarningTime: number;
+  tempThresholdMax: number;
+  tempThresholdMin: number;
+}
+
 // Property name types for type safety
 export type PropertyName = 
   | 'alertEmail'
@@ -66,6 +81,36 @@ export const PropertyUnits: Partial<Record<PropertyName, string>> = {
   noFlowWarningTime: 'min'
 };
 
+// Default values for properties
+export function getDefaultValue(propertyName: PropertyName): any {
+  switch (propertyName) {
+    case 'alertEmail':
+      return '';
+    case 'cloudflowrate':
+    case 'cloudhumidity':
+    case 'cloudtemp':
+      return 0;
+    case 'flowThresholdMin':
+      return 5.0;
+    case 'humidityThresholdMax':
+      return 70.0;
+    case 'humidityThresholdMin':
+      return 30.0;
+    case 'lastUpdateTime':
+      return new Date().toISOString();
+    case 'noFlowCriticalTime':
+      return 3;
+    case 'noFlowWarningTime':
+      return 2;
+    case 'tempThresholdMax':
+      return 35.0;
+    case 'tempThresholdMin':
+      return 5.0;
+    default:
+      return null;
+  }
+}
+
 // Helper functions
 export function formatValue(name: PropertyName, value: any): string {
   if (value === null || value === undefined) return 'Not set';
@@ -105,7 +150,7 @@ export function groupProperties(properties: ArduinoProperty[]): { group: string;
   }));
 }
 
-export function validatePropertyValue(name: PropertyName, value: any): boolean {
+export function validateValue(name: PropertyName, value: any): boolean {
   const type = PropertyTypes[name];
   
   switch (type) {

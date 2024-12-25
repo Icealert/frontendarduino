@@ -8,179 +8,83 @@ export interface ArduinoApiClient {
   updateDeviceSettings(deviceId: string, settings: Partial<DeviceSettings>): Promise<void>;
 }
 
-interface TokenResponse {
-  access_token: string;
-  expires_in: number;
-  token_type: string;
-}
-
 export async function createArduinoApiClient(): Promise<ArduinoApiClient> {
-  // Get base URL from window location or environment
-  const baseUrl = typeof window !== 'undefined' 
-    ? window.location.origin 
-    : process.env.NEXT_PUBLIC_VERCEL_URL 
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : 'http://localhost:3000';
-
-  console.log('Creating Arduino API client:', {
-    baseUrl,
-    hasClientId: !!process.env.client_id,
-    hasClientSecret: !!process.env.client_secret
-  });
-
-  // OPTIONAL: Throw error if either credential is missing
-  if (!process.env.client_id || !process.env.client_secret) {
-    throw new Error(
-      'Missing credentials: client_id and client_secret are required in environment variables.'
-    );
-  }
-
-  // Get access token through proxy endpoint
-  const tokenResponse = await fetch(`${baseUrl}/api/arduino/proxy?endpoint=clients/token`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    }
-  });
-
-  const responseText = await tokenResponse.text();
-  console.log('Token response:', {
-    status: tokenResponse.status,
-    statusText: tokenResponse.statusText,
-    hasResponse: !!responseText,
-    responseLength: responseText.length
-  });
-
-  if (!tokenResponse.ok) {
-    let errorMessage = 'Failed to obtain access token';
-    try {
-      const errorData = JSON.parse(responseText);
-      errorMessage = errorData.error || errorMessage;
-    } catch {
-      errorMessage = tokenResponse.statusText;
-    }
-    throw new Error(`Token request failed: ${errorMessage}`);
-  }
-
-  let tokenData: TokenResponse;
-  try {
-    tokenData = JSON.parse(responseText);
-  } catch (error) {
-    console.error('Failed to parse token response:', error);
-    throw new Error('Failed to parse token response');
-  }
-
-  if (!tokenData?.access_token) {
-    throw new Error('No access token received from Arduino IoT Cloud');
-  }
-
-  console.log('Successfully obtained access token');
-
-  const access_token = tokenData.access_token;
-
-  const makeRequest = async (endpoint: string, options: RequestInit = {}) => {
-    const url = `${baseUrl}/api/arduino/proxy?endpoint=${encodeURIComponent(endpoint)}`;
-    console.log('Making API request to:', url);
-
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...options.headers,
-        'authorization': `Bearer ${access_token}`,
-        'content-type': 'application/json'
-      }
-    });
-
-    const responseText = await response.text();
-    console.log('API response:', {
-      status: response.status,
-      statusText: response.statusText,
-      endpoint,
-      hasResponse: !!responseText,
-      responseLength: responseText.length
-    });
-
-    if (!response.ok) {
-      let errorMessage = 'API request failed';
-      try {
-        const errorData = JSON.parse(responseText);
-        errorMessage = errorData.error || errorMessage;
-      } catch {
-        errorMessage = response.statusText;
-      }
-      throw new Error(`API request failed for ${endpoint}: ${errorMessage}`);
-    }
-
-    try {
-      return JSON.parse(responseText);
-    } catch (error) {
-      console.error('Failed to parse API response:', error);
-      throw new Error(`Failed to parse API response for ${endpoint}`);
-    }
-  };
-
   const client: ArduinoApiClient = {
     async getDevices() {
-      const devices = await makeRequest('devices') as Promise<Omit<ArduinoDevice, 'status'>[]>;
-      const devicesArray = await devices;
+      const response = await fetch('/api/arduino');
+      const data = await response.json();
       
-      return devicesArray.map(device => ({
-        ...device,
-        status: device.events?.some(e => e.name === 'r_status' && e.value === 'CONNECTED') 
-          ? 'ONLINE' as const 
-          : 'OFFLINE' as const
-      }));
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      return data.devices || [];
     },
 
     async getDeviceProperties(deviceId: string) {
-      return makeRequest(`devices/${deviceId}/properties`) as Promise<ArduinoProperty[]>;
+      const response = await fetch(`/api/arduino?deviceId=${deviceId}`);
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      return data.devices?.[0]?.properties || [];
+    },
+
+    async updateProperty(deviceId: string, propertyId: string, value: any) {
+      const response = await fetch('/api/arduino/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deviceId,
+          propertyId,
+          value
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
     },
 
     async getDeviceSettings(deviceId: string) {
       const properties = await this.getDeviceProperties(deviceId);
       const settings: Partial<DeviceSettings> = {};
 
-      properties.forEach(prop => {
-        const key = prop.name as keyof DeviceSettings;
-        settings[key] = prop.value;
+      properties.forEach((prop: ArduinoProperty) => {
+        const name = prop.name as keyof DeviceSettings;
+        if (name) {
+          settings[name] = prop.value;
+        }
       });
 
-      return {
-        alertEmail: validateValue('alertEmail', settings.alertEmail) ? settings.alertEmail : getDefaultValue('alertEmail'),
-        cloudflowrate: validateValue('cloudflowrate', settings.cloudflowrate) ? settings.cloudflowrate : getDefaultValue('cloudflowrate'),
-        cloudhumidity: validateValue('cloudhumidity', settings.cloudhumidity) ? settings.cloudhumidity : getDefaultValue('cloudhumidity'),
-        cloudtemp: validateValue('cloudtemp', settings.cloudtemp) ? settings.cloudtemp : getDefaultValue('cloudtemp'),
-        flowThresholdMin: validateValue('flowThresholdMin', settings.flowThresholdMin) ? settings.flowThresholdMin : getDefaultValue('flowThresholdMin'),
-        humidityThresholdMax: validateValue('humidityThresholdMax', settings.humidityThresholdMax) ? settings.humidityThresholdMax : getDefaultValue('humidityThresholdMax'),
-        humidityThresholdMin: validateValue('humidityThresholdMin', settings.humidityThresholdMin) ? settings.humidityThresholdMin : getDefaultValue('humidityThresholdMin'),
-        lastUpdateTime: validateValue('lastUpdateTime', settings.lastUpdateTime) ? settings.lastUpdateTime : getDefaultValue('lastUpdateTime'),
-        noFlowCriticalTime: validateValue('noFlowCriticalTime', settings.noFlowCriticalTime) ? settings.noFlowCriticalTime : getDefaultValue('noFlowCriticalTime'),
-        noFlowWarningTime: validateValue('noFlowWarningTime', settings.noFlowWarningTime) ? settings.noFlowWarningTime : getDefaultValue('noFlowWarningTime'),
-        tempThresholdMax: validateValue('tempThresholdMax', settings.tempThresholdMax) ? settings.tempThresholdMax : getDefaultValue('tempThresholdMax'),
-        tempThresholdMin: validateValue('tempThresholdMin', settings.tempThresholdMin) ? settings.tempThresholdMin : getDefaultValue('tempThresholdMin')
-      };
+      // Fill in any missing properties with default values
+      (Object.keys(getDefaultValue('alertEmail')) as Array<keyof DeviceSettings>).forEach(propName => {
+        if (settings[propName] === undefined) {
+          settings[propName] = getDefaultValue(propName as any);
+        }
+      });
+
+      return settings as DeviceSettings;
     },
 
     async updateDeviceSettings(deviceId: string, settings: Partial<DeviceSettings>) {
       const properties = await this.getDeviceProperties(deviceId);
-      
-      for (const [key, value] of Object.entries(settings)) {
-        if (!validateValue(key, value)) {
-          throw new Error(`Invalid value for ${key}: ${value}`);
-        }
-        
-        const property = properties.find(p => p.name === key);
-        if (property) {
-          await this.updateProperty(deviceId, property.id, value);
-        }
-      }
-    },
+      const updates: Promise<void>[] = [];
 
-    async updateProperty(deviceId: string, propertyId: string, value: any) {
-      await makeRequest(`devices/${deviceId}/properties/${propertyId}/publish`, {
-        method: 'PUT',
-        body: JSON.stringify({ value })
+      Object.entries(settings).forEach(([name, value]) => {
+        const property = properties.find((p: ArduinoProperty) => p.name === name);
+        if (property && validateValue(name as any, value)) {
+          updates.push(this.updateProperty(deviceId, property.id, value));
+        }
       });
+
+      await Promise.all(updates);
     }
   };
 
