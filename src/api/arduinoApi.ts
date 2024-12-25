@@ -27,49 +27,48 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
 
   const { access_token } = await tokenResponse.json();
 
-  return {
-    async getDevices(): Promise<ArduinoDevice[]> {
-      const response = await fetch('https://api2.arduino.cc/iot/v2/devices', {
-        headers: {
-          'Authorization': `Bearer ${access_token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to get devices: ${response.statusText}`);
+  const makeRequest = async (endpoint: string, options: RequestInit = {}) => {
+    const response = await fetch(`https://api2.arduino.cc/iot/v2/${endpoint}`, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${access_token}`
       }
+    });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    // Check if there's a response body
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 0) {
       return response.json();
+    }
+  };
+
+  const client: ArduinoApiClient = {
+    async getDevices() {
+      return makeRequest('devices') as Promise<ArduinoDevice[]>;
     },
 
-    async getDeviceProperties(deviceId: string): Promise<ArduinoProperty[]> {
-      const response = await fetch(`https://api2.arduino.cc/iot/v2/devices/${deviceId}/properties`, {
-        headers: {
-          'Authorization': `Bearer ${access_token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to get device properties: ${response.statusText}`);
-      }
-
-      return response.json();
+    async getDeviceProperties(deviceId: string) {
+      return makeRequest(`devices/${deviceId}/properties`) as Promise<ArduinoProperty[]>;
     },
 
-    async getDeviceSettings(deviceId: string): Promise<DeviceSettings> {
+    async getDeviceSettings(deviceId: string) {
       const properties = await this.getDeviceProperties(deviceId);
       const settings: Partial<DeviceSettings> = {};
 
       // Map each property to its corresponding setting
       properties.forEach(prop => {
         const key = prop.name as keyof DeviceSettings;
-        if (key in settings) {
-          settings[key] = prop.value;
-        }
+        settings[key] = prop.value;
       });
 
       // Ensure all required properties are present with default values
-      const defaultSettings: DeviceSettings = {
+      return {
         alertEmail: settings.alertEmail || '',
         cloudflowrate: settings.cloudflowrate || 0,
         cloudhumidity: settings.cloudhumidity || 0,
@@ -83,30 +82,18 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
         tempThresholdMax: settings.tempThresholdMax || 30,
         tempThresholdMin: settings.tempThresholdMin || 10
       };
-
-      return defaultSettings;
     },
 
-    async updateProperty(deviceId: string, propertyId: string, value: any): Promise<void> {
-      const response = await fetch(`https://api2.arduino.cc/iot/v2/devices/${deviceId}/properties/${propertyId}/publish`, {
+    async updateProperty(deviceId: string, propertyId: string, value: any) {
+      await makeRequest(`devices/${deviceId}/properties/${propertyId}/publish`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ value })
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to update property: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      // Check if there's a response body
-      const contentLength = response.headers.get('content-length');
-      if (contentLength && parseInt(contentLength) > 0) {
-        await response.json(); // Consume the response body if it exists
-      }
     }
   };
+
+  return client;
 } 
