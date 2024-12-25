@@ -15,11 +15,11 @@ interface TokenResponse {
 }
 
 export async function createArduinoApiClient(
-  clientId: string = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID || '',
-  clientSecret: string = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET || ''
+  clientId: string = process.env.client_id || '',
+  clientSecret: string = process.env.client_secret || ''
 ): Promise<ArduinoApiClient> {
   if (!clientId || !clientSecret) {
-    throw new Error('Client ID and Client Secret are required. Check environment variables.');
+    throw new Error('Client ID and Client Secret are required. Check environment variables (client_id and client_secret).');
   }
 
   // Get base URL from window location or environment
@@ -42,7 +42,9 @@ export async function createArduinoApiClient(
     hasClientId: !!clientId,
     hasClientSecret: !!clientSecret,
     clientIdLength: clientId.length,
-    clientSecretLength: clientSecret.length
+    clientSecretLength: clientSecret.length,
+    envClientId: !!process.env.client_id,
+    envClientSecret: !!process.env.client_secret
   });
 
   // Get access token through proxy endpoint

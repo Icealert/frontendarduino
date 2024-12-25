@@ -74,19 +74,38 @@ async function handleRequest(request: NextRequest) {
         requestHeaders['content-type'] = 'application/x-www-form-urlencoded';
         const formData = await request.formData();
         
+        // Get credentials from environment if not in request
+        const clientId = formData.get('client_id') || process.env.client_id;
+        const clientSecret = formData.get('client_secret') || process.env.client_secret;
+
+        if (!clientId || !clientSecret) {
+          console.error('Missing credentials:', {
+            hasClientId: !!clientId,
+            hasClientSecret: !!clientSecret,
+            envClientId: !!process.env.client_id,
+            envClientSecret: !!process.env.client_secret
+          });
+          return NextResponse.json(
+            { error: 'Missing credentials: client_id and client_secret are required. Check environment variables.' },
+            { status: 400, headers: corsHeaders }
+          );
+        }
+        
         // Create URLSearchParams with explicit string conversion
         const params = new URLSearchParams();
         params.append('grant_type', 'client_credentials');
-        params.append('client_id', String(formData.get('client_id') || ''));
-        params.append('client_secret', String(formData.get('client_secret') || ''));
+        params.append('client_id', String(clientId));
+        params.append('client_secret', String(clientSecret));
         params.append('audience', 'https://api2.arduino.cc/iot');
         
         body = params.toString();
 
         console.log('Token request body:', {
-          hasClientId: !!formData.get('client_id'),
-          hasClientSecret: !!formData.get('client_secret'),
-          bodyLength: body.length
+          hasClientId: !!clientId,
+          hasClientSecret: !!clientSecret,
+          bodyLength: body.length,
+          envClientId: !!process.env.client_id,
+          envClientSecret: !!process.env.client_secret
         });
       } else {
         // For other requests, use JSON
