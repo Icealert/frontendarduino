@@ -38,16 +38,22 @@ export default function DeviceList({ devices, selectedDevice, onDeviceSelect }: 
 
     try {
       setLoadingProperties(prev => ({ ...prev, [deviceId]: true }));
-      const response = await fetch(`/api/arduino/properties/${deviceId}`);
+      const response = await fetch(`/api/arduino?deviceId=${deviceId}`);
       const data = await response.json();
       
       if (data.error) {
         throw new Error(data.error);
       }
       
+      // Find the device in the response and get its properties
+      const device = data.devices?.find((d: ArduinoDevice) => d.id === deviceId);
+      if (!device?.thing?.properties) {
+        throw new Error('No properties found for device');
+      }
+      
       setDeviceProperties(prev => ({
         ...prev,
-        [deviceId]: data.properties || []
+        [deviceId]: device.thing.properties || []
       }));
     } catch (err) {
       console.error('Failed to fetch device properties:', err);
