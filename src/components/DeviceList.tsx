@@ -11,10 +11,10 @@ import {
   getStatusColor,
   groupProperties
 } from '../types/arduino';
-import { ArduinoApiClient } from '../api/arduinoApi';
 
 interface DeviceListProps {
-  client: ArduinoApiClient;
+  devices: ArduinoDevice[];
+  selectedDevice?: ArduinoDevice;
   onDeviceSelect: (device: ArduinoDevice) => void;
 }
 
@@ -23,9 +23,8 @@ interface PropertyGroup {
   properties: ArduinoProperty[];
 }
 
-export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) {
-  const [devices, setDevices] = useState<ArduinoDevice[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function DeviceList({ devices, selectedDevice, onDeviceSelect }: DeviceListProps) {
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedDevice, setExpandedDevice] = useState<string | null>(null);
   const [editableValues, setEditableValues] = useState<{[key: string]: any}>({});
@@ -33,30 +32,6 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
   const [deviceProperties, setDeviceProperties] = useState<{[key: string]: ArduinoProperty[]}>({});
   const [loadingProperties, setLoadingProperties] = useState<{[key: string]: boolean}>({});
   const [editMode, setEditMode] = useState<{[key: string]: boolean}>({});
-
-  useEffect(() => {
-    fetchDevices();
-  }, [client]);
-
-  const fetchDevices = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/arduino');
-      const data = await response.json();
-      
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setDevices(data.devices || []);
-        setError(null);
-      }
-    } catch (err) {
-      setError('Failed to fetch devices');
-      console.error('Error fetching devices:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchDeviceProperties = async (deviceId: string) => {
     if (deviceProperties[deviceId]) return; // Already fetched
@@ -185,7 +160,9 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
       {devices.map(device => (
         <div 
           key={device.id}
-          className="bg-slate-800 rounded-lg shadow-lg overflow-hidden"
+          className={`bg-slate-800 rounded-lg shadow-lg overflow-hidden ${
+            selectedDevice?.id === device.id ? 'ring-2 ring-blue-500' : ''
+          }`}
         >
           <div 
             className="p-4 bg-slate-700 flex items-center justify-between cursor-pointer"
