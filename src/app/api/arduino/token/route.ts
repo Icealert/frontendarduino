@@ -12,35 +12,12 @@ const corsHeaders = {
 
 export async function POST(request: NextRequest) {
   try {
-    // Get credentials from environment variables first
-    let clientId = process.env.client_id;
-    let clientSecret = process.env.client_secret;
+    // Get credentials from environment variables
+    const clientId = process.env.client_id;
+    const clientSecret = process.env.client_secret;
 
-    // Log initial environment check
+    // Log environment check (without exposing actual values)
     console.log('Environment variables check:', {
-      hasEnvClientId: !!clientId,
-      hasEnvClientSecret: !!clientSecret,
-      envClientIdLength: clientId?.length,
-      envClientSecretLength: clientSecret?.length
-    });
-
-    // If not in environment, try to get from request body
-    if (!clientId || !clientSecret) {
-      const body = await request.text();
-      console.log('Checking request body for credentials');
-      
-      try {
-        // Try to parse as URL-encoded form data
-        const params = new URLSearchParams(body);
-        if (!clientId) clientId = params.get('client_id') || undefined;
-        if (!clientSecret) clientSecret = params.get('client_secret') || undefined;
-      } catch (error) {
-        console.error('Failed to parse request body:', error);
-      }
-    }
-
-    // Log final credential status
-    console.log('Credential status:', {
       hasClientId: !!clientId,
       hasClientSecret: !!clientSecret,
       clientIdLength: clientId?.length,
@@ -49,9 +26,9 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!clientId || !clientSecret) {
-      console.error('Missing credentials');
+      console.error('Missing environment variables');
       return NextResponse.json(
-        { error: 'Missing credentials: Provide client_id and client_secret either in environment variables or request body.' },
+        { error: 'Missing credentials: client_id and client_secret environment variables are required.' },
         { status: 400, headers: corsHeaders }
       );
     }
