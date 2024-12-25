@@ -21,8 +21,8 @@ export default function DeviceDetails({ device }: DeviceDetailsProps) {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-slate-300">Status</span>
-          <span className={`${device.status === 'ONLINE' ? 'text-teal-300' : 'text-rose-300'}`}>
-            {device.status}
+          <span className={`${device.device_status === 'ONLINE' ? 'text-teal-300' : 'text-rose-300'}`}>
+            {device.device_status}
           </span>
         </div>
         <div className="flex items-center justify-between">
