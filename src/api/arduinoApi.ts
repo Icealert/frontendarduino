@@ -31,13 +31,17 @@ export async function createArduinoApiClient(
 
   console.log('Creating Arduino API client with base URL:', baseUrl);
 
-  // Get access token from our token endpoint using absolute URL
-  const tokenResponse = await fetch(`${baseUrl}/api/arduino/token`, {
+  // Create form data for token request
+  const formData = new FormData();
+  formData.append('grant_type', 'client_credentials');
+  formData.append('client_id', clientId);
+  formData.append('client_secret', clientSecret);
+  formData.append('audience', 'https://api2.arduino.cc/iot');
+
+  // Get access token through proxy endpoint
+  const tokenResponse = await fetch(`${baseUrl}/api/arduino/proxy?endpoint=clients/token`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/x-www-form-urlencoded'
-    },
-    body: `grant_type=client_credentials&client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}&audience=https://api2.arduino.cc/iot`
+    body: formData
   });
 
   const responseText = await tokenResponse.text();
@@ -117,7 +121,7 @@ export async function createArduinoApiClient(
 
   const client: ArduinoApiClient = {
     async getDevices() {
-      const devices = await makeRequest('v2/devices') as Promise<Omit<ArduinoDevice, 'status'>[]>;
+      const devices = await makeRequest('devices') as Promise<Omit<ArduinoDevice, 'status'>[]>;
       const devicesArray = await devices;
       
       return devicesArray.map(device => ({
@@ -127,7 +131,7 @@ export async function createArduinoApiClient(
     },
 
     async getDeviceProperties(deviceId: string) {
-      return makeRequest(`v2/devices/${deviceId}/properties`) as Promise<ArduinoProperty[]>;
+      return makeRequest(`devices/${deviceId}/properties`) as Promise<ArduinoProperty[]>;
     },
 
     async getDeviceSettings(deviceId: string) {
@@ -171,7 +175,7 @@ export async function createArduinoApiClient(
     },
 
     async updateProperty(deviceId: string, propertyId: string, value: any) {
-      await makeRequest(`v2/devices/${deviceId}/properties/${propertyId}/publish`, {
+      await makeRequest(`devices/${deviceId}/properties/${propertyId}/publish`, {
         method: 'PUT',
         body: JSON.stringify({ value })
       });
