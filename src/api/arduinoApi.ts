@@ -14,14 +14,7 @@ interface TokenResponse {
   token_type: string;
 }
 
-export async function createArduinoApiClient(
-  clientId: string = process.env.client_id || '',
-  clientSecret: string = process.env.client_secret || ''
-): Promise<ArduinoApiClient> {
-  if (!clientId || !clientSecret) {
-    throw new Error('Client ID and Client Secret are required. Check environment variables (client_id and client_secret).');
-  }
-
+export async function createArduinoApiClient(): Promise<ArduinoApiClient> {
   // Get base URL from window location or environment
   const baseUrl = typeof window !== 'undefined' 
     ? window.location.origin 
@@ -29,37 +22,26 @@ export async function createArduinoApiClient(
       ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
       : 'http://localhost:3000';
 
-  console.log('Creating Arduino API client with base URL:', baseUrl);
-
-  // Create form data for token request
-  const formData = new FormData();
-  formData.append('grant_type', 'client_credentials');
-  formData.append('client_id', String(clientId));
-  formData.append('client_secret', String(clientSecret));
-  formData.append('audience', 'https://api2.arduino.cc/iot');
-
-  console.log('Token request parameters:', {
-    hasClientId: !!clientId,
-    hasClientSecret: !!clientSecret,
-    clientIdLength: clientId.length,
-    clientSecretLength: clientSecret.length,
-    envClientId: !!process.env.client_id,
-    envClientSecret: !!process.env.client_secret
+  console.log('Creating Arduino API client:', {
+    baseUrl,
+    hasClientId: !!process.env.client_id,
+    hasClientSecret: !!process.env.client_secret
   });
 
   // Get access token through proxy endpoint
   const tokenResponse = await fetch(`${baseUrl}/api/arduino/proxy?endpoint=clients/token`, {
     method: 'POST',
-    body: formData
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
   });
 
   const responseText = await tokenResponse.text();
   console.log('Token response:', {
     status: tokenResponse.status,
     statusText: tokenResponse.statusText,
-    body: responseText,
-    hasClientId: !!clientId,
-    hasClientSecret: !!clientSecret
+    hasResponse: !!responseText,
+    responseLength: responseText.length
   });
 
   if (!tokenResponse.ok) {
@@ -70,7 +52,7 @@ export async function createArduinoApiClient(
     } catch {
       errorMessage = tokenResponse.statusText;
     }
-    throw new Error(errorMessage);
+    throw new Error(`Token request failed: ${errorMessage}`);
   }
 
   let tokenData: TokenResponse;
@@ -106,7 +88,9 @@ export async function createArduinoApiClient(
     console.log('API response:', {
       status: response.status,
       statusText: response.statusText,
-      body: responseText
+      endpoint,
+      hasResponse: !!responseText,
+      responseLength: responseText.length
     });
 
     if (!response.ok) {
@@ -117,14 +101,14 @@ export async function createArduinoApiClient(
       } catch {
         errorMessage = response.statusText;
       }
-      throw new Error(errorMessage);
+      throw new Error(`API request failed for ${endpoint}: ${errorMessage}`);
     }
 
     try {
       return JSON.parse(responseText);
     } catch (error) {
       console.error('Failed to parse API response:', error);
-      throw new Error('Failed to parse API response');
+      throw new Error(`Failed to parse API response for ${endpoint}`);
     }
   };
 

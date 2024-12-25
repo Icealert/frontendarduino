@@ -53,7 +53,9 @@ async function handleRequest(request: NextRequest) {
       method: request.method,
       url,
       endpoint,
-      version
+      version,
+      hasClientId: !!process.env.client_id,
+      hasClientSecret: !!process.env.client_secret
     });
 
     // Get the request body if it exists
@@ -72,11 +74,10 @@ async function handleRequest(request: NextRequest) {
       // For token requests, handle form data
       if (endpoint === 'clients/token') {
         requestHeaders['content-type'] = 'application/x-www-form-urlencoded';
-        const formData = await request.formData();
         
-        // Get credentials from environment if not in request
-        const clientId = formData.get('client_id') || process.env.client_id;
-        const clientSecret = formData.get('client_secret') || process.env.client_secret;
+        // Get credentials from environment variables
+        const clientId = process.env.client_id;
+        const clientSecret = process.env.client_secret;
 
         if (!clientId || !clientSecret) {
           console.error('Missing credentials:', {
@@ -86,26 +87,25 @@ async function handleRequest(request: NextRequest) {
             envClientSecret: !!process.env.client_secret
           });
           return NextResponse.json(
-            { error: 'Missing credentials: client_id and client_secret are required. Check environment variables.' },
+            { error: 'Missing credentials: client_id and client_secret are required in environment variables.' },
             { status: 400, headers: corsHeaders }
           );
         }
         
         // Create URLSearchParams with explicit string conversion
-        const params = new URLSearchParams();
-        params.append('grant_type', 'client_credentials');
-        params.append('client_id', String(clientId));
-        params.append('client_secret', String(clientSecret));
-        params.append('audience', 'https://api2.arduino.cc/iot');
-        
-        body = params.toString();
+        body = new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: String(clientId),
+          client_secret: String(clientSecret),
+          audience: 'https://api2.arduino.cc/iot'
+        }).toString();
 
-        console.log('Token request body:', {
+        console.log('Token request:', {
+          url,
           hasClientId: !!clientId,
           hasClientSecret: !!clientSecret,
           bodyLength: body.length,
-          envClientId: !!process.env.client_id,
-          envClientSecret: !!process.env.client_secret
+          headers: requestHeaders
         });
       } else {
         // For other requests, use JSON
@@ -113,8 +113,6 @@ async function handleRequest(request: NextRequest) {
         body = await request.text();
       }
     }
-
-    console.log('Request headers:', requestHeaders);
 
     // Forward the request to Arduino API
     const response = await fetch(url, {
@@ -129,7 +127,7 @@ async function handleRequest(request: NextRequest) {
       status: response.status,
       statusText: response.statusText,
       headers: Object.fromEntries(response.headers.entries()),
-      body: responseText
+      body: responseText.substring(0, 1000) // Log first 1000 chars to avoid excessive logging
     });
 
     // Try to parse as JSON
@@ -148,7 +146,8 @@ async function handleRequest(request: NextRequest) {
       console.error('Request failed:', {
         status: response.status,
         statusText: response.statusText,
-        data: responseData
+        data: responseData,
+        endpoint
       });
       return NextResponse.json(
         { error: responseData.error || 'Request to Arduino IoT Cloud failed' },
