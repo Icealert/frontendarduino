@@ -23,10 +23,14 @@ export async function POST(request: NextRequest) {
     const clientId = params.get('client_id') || process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID;
     const clientSecret = params.get('client_secret') || process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET;
 
-    // Log request details for debugging
+    // Log request details for debugging (without exposing secrets)
     console.log('Token request parameters:', {
       hasClientId: !!clientId,
-      hasClientSecret: !!clientSecret
+      hasClientSecret: !!clientSecret,
+      envClientId: !!process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID,
+      envClientSecret: !!process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET,
+      clientIdLength: clientId?.length,
+      clientSecretLength: clientSecret?.length
     });
 
     // Validate required fields
@@ -38,7 +42,7 @@ export async function POST(request: NextRequest) {
         envClientSecret: !!process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET
       });
       return NextResponse.json(
-        { error: 'Missing credentials: client_id and client_secret are required' },
+        { error: 'Missing credentials: client_id and client_secret are required. Check environment variables.' },
         { status: 400, headers: corsHeaders }
       );
     }
@@ -57,7 +61,11 @@ export async function POST(request: NextRequest) {
       status: response.status,
       statusText: response.statusText,
       headers: Object.fromEntries(response.headers.entries()),
-      body: responseText
+      body: responseText,
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret,
+      clientIdLength: clientId.length,
+      clientSecretLength: clientSecret.length
     });
 
     let responseData;

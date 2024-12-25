@@ -14,9 +14,12 @@ interface TokenResponse {
   token_type: string;
 }
 
-export async function createArduinoApiClient(clientId: string, clientSecret: string): Promise<ArduinoApiClient> {
+export async function createArduinoApiClient(
+  clientId: string = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_ID || '',
+  clientSecret: string = process.env.NEXT_PUBLIC_ARDUINO_CLIENT_SECRET || ''
+): Promise<ArduinoApiClient> {
   if (!clientId || !clientSecret) {
-    throw new Error('Client ID and Client Secret are required');
+    throw new Error('Client ID and Client Secret are required. Check environment variables.');
   }
 
   // Get base URL from window location or environment
@@ -41,7 +44,9 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
   console.log('Token response:', {
     status: tokenResponse.status,
     statusText: tokenResponse.statusText,
-    body: responseText
+    body: responseText,
+    hasClientId: !!clientId,
+    hasClientSecret: !!clientSecret
   });
 
   if (!tokenResponse.ok) {
