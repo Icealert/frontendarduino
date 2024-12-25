@@ -1,4 +1,4 @@
-import { ArduinoDevice, ArduinoProperty, DeviceSettings } from '@/types/arduino';
+import { ArduinoDevice, ArduinoProperty, DeviceSettings, validateValue, getDefaultValue } from '@/types/arduino';
 
 export interface ArduinoApiClient {
   getDevices(): Promise<ArduinoDevice[]>;
@@ -9,44 +9,45 @@ export interface ArduinoApiClient {
 }
 
 export async function createArduinoApiClient(clientId: string, clientSecret: string): Promise<ArduinoApiClient> {
-  const tokenResponse = await fetch('https://api2.arduino.cc/iot/v1/clients/token', {
+  // Get access token through our proxy API
+  const tokenResponse = await fetch('/api/arduino/proxy?endpoint=clients/token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json'
     },
     body: new URLSearchParams({
       grant_type: 'client_credentials',
       client_id: clientId,
       client_secret: clientSecret,
       audience: 'https://api2.arduino.cc/iot'
-    })
+    }).toString()
   });
 
   if (!tokenResponse.ok) {
-    throw new Error(`Failed to get access token: ${tokenResponse.statusText}`);
+    const error = await tokenResponse.json();
+    throw new Error(`Failed to get access token: ${error.error || error.message || tokenResponse.statusText}`);
   }
 
   const { access_token } = await tokenResponse.json();
 
   const makeRequest = async (endpoint: string, options: RequestInit = {}) => {
-    const response = await fetch(`https://api2.arduino.cc/iot/v2/${endpoint}`, {
+    // Use our serverless proxy for all Arduino API requests
+    const response = await fetch(`/api/arduino/proxy?endpoint=${encodeURIComponent(endpoint)}`, {
       ...options,
       headers: {
         ...options.headers,
-        'Authorization': `Bearer ${access_token}`
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json',
       }
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
+      const error = await response.json();
+      throw new Error(`API request failed: ${error.error || response.statusText}`);
     }
 
-    // Check if there's a response body
-    const contentLength = response.headers.get('content-length');
-    if (contentLength && parseInt(contentLength) > 0) {
-      return response.json();
-    }
+    return response.json();
   };
 
   const client: ArduinoApiClient = {
@@ -54,7 +55,6 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       const devices = await makeRequest('devices') as Promise<Omit<ArduinoDevice, 'status'>[]>;
       const devicesArray = await devices;
       
-      // Map devices and explicitly type the status
       return devicesArray.map(device => ({
         ...device,
         status: device.events?.some(e => e.type === 'DEVICE_ONLINE') ? 'ONLINE' as const : 'OFFLINE' as const
@@ -69,35 +69,37 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       const properties = await this.getDeviceProperties(deviceId);
       const settings: Partial<DeviceSettings> = {};
 
-      // Map each property to its corresponding setting
       properties.forEach(prop => {
         const key = prop.name as keyof DeviceSettings;
         settings[key] = prop.value;
       });
 
-      // Ensure all required properties are present with default values
+      // Return settings with proper type validation and defaults
       return {
-        alertEmail: settings.alertEmail || '',
-        cloudflowrate: settings.cloudflowrate || 0,
-        cloudhumidity: settings.cloudhumidity || 0,
-        cloudtemp: settings.cloudtemp || 0,
-        flowThresholdMin: settings.flowThresholdMin || 5,
-        humidityThresholdMax: settings.humidityThresholdMax || 80,
-        humidityThresholdMin: settings.humidityThresholdMin || 20,
-        lastUpdateTime: settings.lastUpdateTime || new Date().toISOString(),
-        noFlowCriticalTime: settings.noFlowCriticalTime || 5,
-        noFlowWarningTime: settings.noFlowWarningTime || 3,
-        tempThresholdMax: settings.tempThresholdMax || 30,
-        tempThresholdMin: settings.tempThresholdMin || 10
+        alertEmail: validateValue('alertEmail', settings.alertEmail) ? settings.alertEmail : getDefaultValue('alertEmail'),
+        cloudflowrate: validateValue('cloudflowrate', settings.cloudflowrate) ? settings.cloudflowrate : getDefaultValue('cloudflowrate'),
+        cloudhumidity: validateValue('cloudhumidity', settings.cloudhumidity) ? settings.cloudhumidity : getDefaultValue('cloudhumidity'),
+        cloudtemp: validateValue('cloudtemp', settings.cloudtemp) ? settings.cloudtemp : getDefaultValue('cloudtemp'),
+        flowThresholdMin: validateValue('flowThresholdMin', settings.flowThresholdMin) ? settings.flowThresholdMin : getDefaultValue('flowThresholdMin'),
+        humidityThresholdMax: validateValue('humidityThresholdMax', settings.humidityThresholdMax) ? settings.humidityThresholdMax : getDefaultValue('humidityThresholdMax'),
+        humidityThresholdMin: validateValue('humidityThresholdMin', settings.humidityThresholdMin) ? settings.humidityThresholdMin : getDefaultValue('humidityThresholdMin'),
+        lastUpdateTime: validateValue('lastUpdateTime', settings.lastUpdateTime) ? settings.lastUpdateTime : getDefaultValue('lastUpdateTime'),
+        noFlowCriticalTime: validateValue('noFlowCriticalTime', settings.noFlowCriticalTime) ? settings.noFlowCriticalTime : getDefaultValue('noFlowCriticalTime'),
+        noFlowWarningTime: validateValue('noFlowWarningTime', settings.noFlowWarningTime) ? settings.noFlowWarningTime : getDefaultValue('noFlowWarningTime'),
+        tempThresholdMax: validateValue('tempThresholdMax', settings.tempThresholdMax) ? settings.tempThresholdMax : getDefaultValue('tempThresholdMax'),
+        tempThresholdMin: validateValue('tempThresholdMin', settings.tempThresholdMin) ? settings.tempThresholdMin : getDefaultValue('tempThresholdMin')
       };
     },
 
     async updateDeviceSettings(deviceId: string, settings: Partial<DeviceSettings>) {
-      // Get current properties to map settings to property IDs
       const properties = await this.getDeviceProperties(deviceId);
       
-      // Update each setting
       for (const [key, value] of Object.entries(settings)) {
+        // Validate value before updating
+        if (!validateValue(key, value)) {
+          throw new Error(`Invalid value for ${key}: ${value}`);
+        }
+        
         const property = properties.find(p => p.name === key);
         if (property) {
           await this.updateProperty(deviceId, property.id, value);
@@ -108,9 +110,6 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
     async updateProperty(deviceId: string, propertyId: string, value: any) {
       await makeRequest(`devices/${deviceId}/properties/${propertyId}/publish`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ value })
       });
     }

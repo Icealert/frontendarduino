@@ -57,17 +57,71 @@ export function getInputType(propertyName: string): string {
       return 'email';
     case 'lastUpdateTime':
       return 'datetime-local';
-    default:
+    case 'noFlowCriticalTime':
+    case 'noFlowWarningTime':
       return 'number';
+    case 'flowThresholdMin':
+    case 'humidityThresholdMax':
+    case 'humidityThresholdMin':
+    case 'tempThresholdMax':
+    case 'tempThresholdMin':
+      return 'number';
+    default:
+      return 'text';
   }
 }
 
-export function getStepValue(propertyName: string): string {
-  if (propertyName.includes('temp')) return '0.1';
-  if (propertyName.includes('humidity')) return '1';
-  if (propertyName.includes('flow')) return '0.1';
-  if (propertyName.includes('Time')) return '1';
-  return 'any';
+export function getDefaultValue(propertyName: string): any {
+  switch (propertyName) {
+    case 'alertEmail':
+      return '';
+    case 'cloudflowrate':
+    case 'cloudhumidity':
+    case 'cloudtemp':
+      return 0;
+    case 'flowThresholdMin':
+      return 5.0;
+    case 'humidityThresholdMax':
+      return 80.0;
+    case 'humidityThresholdMin':
+      return 20.0;
+    case 'lastUpdateTime':
+      return new Date().toISOString();
+    case 'noFlowCriticalTime':
+      return 5;
+    case 'noFlowWarningTime':
+      return 3;
+    case 'tempThresholdMax':
+      return 30.0;
+    case 'tempThresholdMin':
+      return 10.0;
+    default:
+      return null;
+  }
+}
+
+export function validateValue(propertyName: string, value: any): boolean {
+  switch (propertyName) {
+    case 'alertEmail':
+      return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    case 'cloudflowrate':
+    case 'cloudhumidity':
+    case 'cloudtemp':
+      return typeof value === 'number' && !isNaN(value);
+    case 'flowThresholdMin':
+    case 'humidityThresholdMax':
+    case 'humidityThresholdMin':
+    case 'tempThresholdMax':
+    case 'tempThresholdMin':
+      return typeof value === 'number' && !isNaN(value) && Number.isFinite(value);
+    case 'lastUpdateTime':
+      return typeof value === 'string' && !isNaN(Date.parse(value));
+    case 'noFlowCriticalTime':
+    case 'noFlowWarningTime':
+      return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+    default:
+      return true;
+  }
 }
 
 export function formatValue(name: string, value: any): string {
