@@ -51,12 +51,13 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
   const client: ArduinoApiClient = {
     async getDevices() {
       const devices = await makeRequest('devices') as Promise<Omit<ArduinoDevice, 'status'>[]>;
-      // Get device status from events
-      const devicesWithStatus = (await devices).map(device => ({
+      const devicesArray = await devices;
+      
+      // Map devices and explicitly type the status
+      return devicesArray.map(device => ({
         ...device,
-        status: device.events?.some(e => e.type === 'DEVICE_ONLINE') ? 'ONLINE' : 'OFFLINE'
+        status: device.events?.some(e => e.type === 'DEVICE_ONLINE') ? 'ONLINE' as const : 'OFFLINE' as const
       }));
-      return devicesWithStatus;
     },
 
     async getDeviceProperties(deviceId: string) {
