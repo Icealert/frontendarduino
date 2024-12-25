@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArduinoApiClient, ArduinoDevice, DeviceSettings } from '@/types/arduino';
+import { ArduinoDevice, DeviceSettings } from '@/types/arduino';
+import { ArduinoApiClient } from '@/api/arduinoApi';
 
 export function useArduinoDevices(client: ArduinoApiClient | null) {
   const queryClient = useQueryClient();
