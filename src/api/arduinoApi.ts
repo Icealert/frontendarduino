@@ -26,17 +26,21 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
       ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
       : 'http://localhost:3000';
 
-  // Create form data for token request
-  const formData = new FormData();
-  formData.append('grant_type', 'client_credentials');
-  formData.append('client_id', clientId);
-  formData.append('client_secret', clientSecret);
-  formData.append('audience', 'https://api2.arduino.cc/iot');
+  // Create token request body
+  const tokenBody = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: clientId,
+    client_secret: clientSecret,
+    audience: 'https://api2.arduino.cc/iot'
+  }).toString();
 
   // Get access token from our token endpoint using absolute URL
   const tokenResponse = await fetch(`${baseUrl}/api/arduino/token`, {
     method: 'POST',
-    body: formData
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: tokenBody
   });
 
   if (!tokenResponse.ok) {
@@ -54,6 +58,7 @@ export async function createArduinoApiClient(clientId: string, clientSecret: str
   try {
     tokenData = await tokenResponse.json();
   } catch (error) {
+    console.error('Failed to parse token response:', error);
     throw new Error('Failed to parse token response');
   }
 
