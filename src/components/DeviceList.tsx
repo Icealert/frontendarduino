@@ -97,7 +97,7 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
 
   const handleSaveChanges = async (deviceId: string) => {
     try {
-      setSaving(prev => ({ ...prev, deviceId: true }));
+      setSaving(prev => ({ ...prev, [deviceId]: true }));
       
       // Get all changed properties for this device
       const changedProperties = Object.entries(editableValues)
@@ -128,27 +128,30 @@ export default function DeviceList({ client, onDeviceSelect }: DeviceListProps) 
         if (data.error) {
           throw new Error(data.error);
         }
+
+        // Update local state with the verified value from Arduino Cloud
+        if (data.property) {
+          setDeviceProperties(prev => ({
+            ...prev,
+            [deviceId]: prev[deviceId]?.map(p => 
+              p.name === data.property.name ? data.property : p
+            ) || []
+          }));
+        }
       }
 
-      // Update local state
-      setDeviceProperties(prev => ({
-        ...prev,
-        [deviceId]: prev[deviceId]?.map(prop => 
-          editableValues[prop.name] !== undefined
-            ? { ...prop, value: editableValues[prop.name] }
-            : prop
-        ) || []
-      }));
-
-      // Clear editable values
+      // Clear editable values and exit edit mode
       setEditableValues({});
       setEditMode(prev => ({ ...prev, [deviceId]: false }));
 
+      // Refresh the device properties to ensure we have the latest values
+      await fetchDeviceProperties(deviceId);
+
     } catch (err) {
       console.error('Failed to save changes:', err);
-      setError('Failed to save changes');
+      setError('Failed to save changes. Please try again.');
     } finally {
-      setSaving(prev => ({ ...prev, deviceId: false }));
+      setSaving(prev => ({ ...prev, [deviceId]: false }));
     }
   };
 

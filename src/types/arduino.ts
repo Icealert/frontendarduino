@@ -14,41 +14,44 @@ export interface ArduinoDevice {
 }
 
 export interface DeviceSettings {
-  temperatureRange: {
-    min: number;
-    max: number;
-  };
-  humidityRange: {
-    min: number;
-    max: number;
-  };
-  flowRateThreshold: number;
-  noFlowWarningTime: number;
+  alertEmail: string;
+  cloudflowrate: number;
+  cloudhumidity: number;
+  cloudtemp: number;
+  flowThresholdMin: number;
+  humidityThresholdMax: number;
+  humidityThresholdMin: number;
+  lastUpdateTime: string;
   noFlowCriticalTime: number;
-  alertEmail?: string;
-}
-
-export interface EditableValues {
-  [key: string]: any;
+  noFlowWarningTime: number;
+  tempThresholdMax: number;
+  tempThresholdMin: number;
 }
 
 // Helper functions
 export function isEditable(propertyName: string): boolean {
   const editableProperties = [
-    'tempThresholdMin', 'tempThresholdMax',
-    'humidityThresholdMin', 'humidityThresholdMax',
+    'alertEmail',
     'flowThresholdMin',
-    'noFlowWarningTime', 'noFlowCriticalTime',
-    'alertEmail'
+    'humidityThresholdMax',
+    'humidityThresholdMin',
+    'noFlowCriticalTime',
+    'noFlowWarningTime',
+    'tempThresholdMax',
+    'tempThresholdMin'
   ];
   return editableProperties.includes(propertyName);
 }
 
 export function getInputType(propertyName: string): string {
-  if (propertyName === 'alertEmail') return 'email';
-  if (propertyName.includes('Time')) return 'number';
-  if (propertyName.includes('temp') || propertyName.includes('humidity') || propertyName.includes('flow')) return 'number';
-  return 'text';
+  switch (propertyName) {
+    case 'alertEmail':
+      return 'email';
+    case 'lastUpdateTime':
+      return 'datetime-local';
+    default:
+      return 'number';
+  }
 }
 
 export function getStepValue(propertyName: string): string {
@@ -62,6 +65,8 @@ export function getStepValue(propertyName: string): string {
 export function formatValue(name: string, value: any): string {
   switch (name) {
     case 'cloudtemp':
+    case 'tempThresholdMin':
+    case 'tempThresholdMax':
       return `${value}°C`;
     case 'cloudhumidity':
     case 'humidityThresholdMin':
@@ -75,36 +80,45 @@ export function formatValue(name: string, value: any): string {
       return `${value} min`;
     case 'lastUpdateTime':
       return new Date(value).toLocaleString();
+    case 'alertEmail':
+      return value || 'Not set';
     default:
       return String(value);
   }
 }
 
 export function getStatusColor(propertyName: string, value: any): string {
-  switch (propertyName) {
-    case 'deviceStatus':
-      return value.toLowerCase() === 'safe' 
-        ? 'text-teal-300' 
-        : value.toLowerCase() === 'warning'
-          ? 'text-amber-300'
-          : 'text-rose-300';
-    case 'powerStatus':
-      return value.toLowerCase() === 'stable' ? 'text-teal-300' : 'text-amber-300';
-    case 'anomaliesDetected':
-      return value ? 'text-rose-300' : 'text-teal-300';
-    default:
-      return 'text-indigo-100';
+  // Measurement variables
+  if (['cloudtemp', 'cloudhumidity', 'cloudflowrate'].includes(propertyName)) {
+    return 'text-blue-300';
   }
+  // Threshold variables
+  if (propertyName.includes('Threshold')) {
+    return 'text-amber-300';
+  }
+  // Time variables
+  if (propertyName.includes('Time')) {
+    return 'text-indigo-300';
+  }
+  // Email
+  if (propertyName === 'alertEmail') {
+    return value ? 'text-teal-300' : 'text-rose-300';
+  }
+  return 'text-slate-300';
 }
 
 export function groupProperties(properties: ArduinoProperty[]) {
   const groups = {
     measurements: ['cloudtemp', 'cloudhumidity', 'cloudflowrate'],
-    thresholds: ['tempThresholdMin', 'tempThresholdMax', 'humidityThresholdMin', 'humidityThresholdMax', 'flowThresholdMin'],
-    timing: ['noFlowWarningTime', 'noFlowCriticalTime'],
-    status: ['deviceStatus', 'powerStatus', 'anomaliesDetected'],
-    config: ['alertEmail'],
-    system: ['lastUpdateTime']
+    thresholds: [
+      'tempThresholdMin', 
+      'tempThresholdMax', 
+      'humidityThresholdMin', 
+      'humidityThresholdMax', 
+      'flowThresholdMin'
+    ],
+    timing: ['noFlowWarningTime', 'noFlowCriticalTime', 'lastUpdateTime'],
+    config: ['alertEmail']
   };
 
   return Object.entries(groups).map(([group, propertyNames]) => ({
