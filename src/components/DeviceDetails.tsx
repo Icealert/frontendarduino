@@ -6,7 +6,8 @@ import {
   formatValue, 
   groupProperties, 
   PropertyName,
-  DefaultValues 
+  DefaultValues,
+  PropertyTypes 
 } from '../types/arduino';
 
 interface DeviceDetailsProps {
@@ -24,17 +25,32 @@ export default function DeviceDetails({ device }: DeviceDetailsProps) {
 
   // Get all expected properties with their values or N/A
   const properties = Object.keys(DefaultValues).map((propName) => {
-    const existingProp = device.properties?.find(p => p.name === propName);
+    const existingProp = device.properties?.find(p => 
+      p && 
+      typeof p === 'object' && 
+      !Array.isArray(p) && 
+      p.name === propName
+    );
+
     return {
       id: existingProp?.id || propName,
       name: propName as PropertyName,
-      type: existingProp?.type || 'String',
+      type: existingProp?.type || PropertyTypes[propName as PropertyName],
       value: existingProp?.value ?? null,
-      updated_at: existingProp?.updated_at
+      updated_at: existingProp?.updated_at,
+      permission: existingProp?.permission || 'READ_WRITE',
+      variable_name: existingProp?.variable_name || propName
     } as ArduinoProperty;
   });
 
   const propertyGroups = groupProperties(properties);
+
+  // Get the most recent update time from any property
+  const lastUpdateTime = properties
+    .map(p => p.updated_at)
+    .filter(Boolean)
+    .sort()
+    .reverse()[0];
 
   return (
     <div className="bg-slate-800 rounded-lg shadow-lg p-4">
@@ -84,7 +100,7 @@ export default function DeviceDetails({ device }: DeviceDetailsProps) {
           <div className="flex items-center justify-between">
             <span className="text-slate-400">Last Updated</span>
             <span className="text-slate-500">
-              {properties[0]?.updated_at ? new Date(properties[0].updated_at).toLocaleString() : 'N/A'}
+              {lastUpdateTime ? new Date(lastUpdateTime).toLocaleString() : 'N/A'}
             </span>
           </div>
         </div>

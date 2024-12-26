@@ -146,27 +146,33 @@ export function groupProperties(rawProperties: any): { group: string; properties
   // Log raw input
   console.log('Raw properties input:', JSON.stringify(rawProperties, null, 2));
 
-  // Safely convert to array
+  // Safely convert to array and filter out non-object values
   let properties: any[] = [];
   try {
     if (Array.isArray(rawProperties)) {
-      properties = rawProperties;
+      properties = rawProperties.filter(prop => 
+        prop && 
+        typeof prop === 'object' && 
+        !Array.isArray(prop) &&
+        typeof prop.name === 'string' &&
+        prop.name.trim() !== ''
+      );
     } else if (typeof rawProperties === 'object' && rawProperties !== null) {
-      properties = Object.values(rawProperties);
+      properties = Object.values(rawProperties).filter(prop => 
+        prop && 
+        typeof prop === 'object' && 
+        !Array.isArray(prop) &&
+        typeof prop.name === 'string' &&
+        prop.name.trim() !== ''
+      );
     }
   } catch (error) {
-    console.error('Error converting properties to array:', error);
+    console.error('Error processing properties:', error);
     return [];
   }
 
-  // Log converted array
-  console.log('Properties array:', JSON.stringify(properties, null, 2));
-
-  // Validate properties array
-  if (!Array.isArray(properties)) {
-    console.warn('Properties could not be converted to array:', rawProperties);
-    return [];
-  }
+  // Log filtered array
+  console.log('Filtered properties array:', JSON.stringify(properties, null, 2));
 
   // Initialize groups
   const groupMap = new Map<string, ArduinoProperty[]>([
@@ -176,21 +182,9 @@ export function groupProperties(rawProperties: any): { group: string; properties
     ['Configuration', []]
   ]);
 
-  // Process each property with validation
-  properties.forEach((prop, index) => {
+  // Process each property
+  properties.forEach((prop) => {
     try {
-      // Validate property object
-      if (!prop || typeof prop !== 'object') {
-        console.warn(`Invalid property at index ${index}:`, prop);
-        return;
-      }
-
-      // Validate required fields
-      if (!prop.name || typeof prop.name !== 'string') {
-        console.warn(`Property at index ${index} missing valid name:`, prop);
-        return;
-      }
-
       // Determine group
       let group = 'Configuration';
       const name = prop.name.toLowerCase();
@@ -203,36 +197,37 @@ export function groupProperties(rawProperties: any): { group: string; properties
         group = 'Timing';
       }
 
-      // Add to group
-      if (!groupMap.has(group)) {
-        groupMap.set(group, []);
-      }
-
       // Clean property object before adding
       const cleanProperty: ArduinoProperty = {
-        id: prop.id || `generated_${index}`,
+        id: prop.id || `generated_${prop.name}`,
         name: prop.name,
         type: prop.type || 'String',
-        value: prop.value,
+        value: prop.value ?? null,
         last_value: prop.last_value,
         updated_at: prop.updated_at,
-        variable_name: prop.variable_name
+        variable_name: prop.variable_name,
+        permission: prop.permission,
+        update_parameter: prop.update_parameter,
+        update_strategy: prop.update_strategy,
+        thing_id: prop.thing_id,
+        thing_name: prop.thing_name,
+        device_id: prop.device_id,
+        channel: prop.channel
       };
 
       groupMap.get(group)!.push(cleanProperty);
-      console.log(`Added property to ${group}:`, JSON.stringify(cleanProperty, null, 2));
 
     } catch (error) {
-      console.error(`Error processing property at index ${index}:`, error, prop);
+      console.error('Error processing property:', error, prop);
     }
   });
 
-  // Build result array
+  // Build result array, only including groups with properties
   const result = Array.from(groupMap.entries())
     .filter(([_, props]) => props.length > 0)
     .map(([group, props]) => ({
       group,
-      properties: props
+      properties: props.sort((a, b) => a.name.localeCompare(b.name))
     }));
 
   // Log final result
