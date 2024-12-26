@@ -17,65 +17,107 @@ interface DeviceMetrics {
 }
 
 function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
-  // Convert properties to array if it's not already
-  const properties = Array.isArray(device.properties) 
-    ? device.properties 
-    : Object.values(device.properties || {});
+  // Ensure we have a valid device
+  if (!device) {
+    console.warn('Device is undefined or null');
+    return {
+      flowrate: 'No data',
+      humidity: 'No data',
+      temperature: 'No data',
+      lastUpdate: null
+    };
+  }
+
+  // Log raw device data for debugging
+  console.log('Raw device data:', JSON.stringify(device, null, 2));
+
+  // Safely extract properties array
+  let properties: any[] = [];
+  try {
+    if (device.properties) {
+      if (Array.isArray(device.properties)) {
+        properties = device.properties;
+      } else if (typeof device.properties === 'object') {
+        properties = Object.values(device.properties);
+      }
+    }
+  } catch (error) {
+    console.error('Error extracting properties:', error);
+  }
+
+  // Log extracted properties
+  console.log('Extracted properties:', JSON.stringify(properties, null, 2));
   
-  // Safe property lookup function that matches Arduino IoT Cloud API format
+  // Safe property lookup function
   const findPropertyValue = (propertyName: PropertyName): string => {
     try {
-      // Ensure we're working with an array
-      if (!Array.isArray(properties)) {
-        console.warn('Properties is not an array:', properties);
+      // Log search attempt
+      console.log(`Searching for property: ${propertyName}`);
+
+      // Find property with matching name, with validation
+      const property = properties.find(p => {
+        if (!p || typeof p !== 'object') {
+          console.warn('Invalid property object:', p);
+          return false;
+        }
+
+        const nameMatch = p.name === propertyName || p.variable_name === propertyName;
+        if (nameMatch) {
+          console.log('Found matching property:', JSON.stringify(p, null, 2));
+        }
+        return nameMatch;
+      });
+
+      if (!property) {
+        console.log(`No property found with name: ${propertyName}`);
         return 'No data';
       }
 
-      // Find property with matching name or variable_name
-      const property = properties.find(p => 
-        p && 
-        typeof p === 'object' && 
-        (
-          (p.name && p.name === propertyName) || 
-          (p.variable_name && p.variable_name === propertyName)
-        )
-      );
-      
-      // Check if property exists and has a value
-      if (property) {
-        const value = property.last_value ?? property.value;
-        if (value !== undefined && value !== null) {
-          return formatValue(propertyName, value);
-        }
+      // Get value with validation
+      const value = property.last_value ?? property.value;
+      if (value === undefined || value === null) {
+        console.log(`No value found for property: ${propertyName}`);
+        return 'No data';
       }
-      
-      return 'No data';
+
+      // Format and return value
+      const formattedValue = formatValue(propertyName, value);
+      console.log(`Formatted value for ${propertyName}:`, formattedValue);
+      return formattedValue;
+
     } catch (error) {
-      console.error(`Error getting value for ${propertyName}:`, error);
+      console.error(`Error processing property ${propertyName}:`, error);
       return 'No data';
     }
   };
 
-  // Get last update time safely
+  // Get last update time with validation
   let lastUpdate: string | null = null;
   try {
-    // Convert to array if needed for timestamp lookup
-    const propsArray = Array.isArray(properties) ? properties : Object.values(properties || {});
-    const lastUpdateProp = propsArray[0]?.updated_at || propsArray[0]?.last_update_at;
-    if (lastUpdateProp) {
-      lastUpdate = new Date(lastUpdateProp).toLocaleString();
+    const validProperties = properties.filter(p => p && typeof p === 'object' && p.updated_at);
+    const lastProperty = validProperties[0];
+    
+    if (lastProperty?.updated_at) {
+      lastUpdate = new Date(lastProperty.updated_at).toLocaleString();
+      console.log('Last update time:', lastUpdate);
+    } else {
+      console.log('No valid update time found');
     }
   } catch (error) {
     console.error('Error getting last update time:', error);
   }
 
-  // Return metrics with safe property lookups
-  return {
+  // Build metrics object
+  const metrics = {
     flowrate: findPropertyValue('cloudflowrate'),
     humidity: findPropertyValue('cloudhumidity'),
     temperature: findPropertyValue('cloudtemp'),
     lastUpdate
   };
+
+  // Log final metrics
+  console.log('Final metrics:', metrics);
+  return metrics;
 }
 
 export default function DeviceList({ devices, selectedDevice, onDeviceSelect }: DeviceListProps) {

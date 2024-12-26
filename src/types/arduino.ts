@@ -188,7 +188,22 @@ export function groupProperties(rawProperties: any): { group: string; properties
       : (rawProperties?.properties || []);
 
     // Process raw properties into a map
-    propertiesArray.forEach(prop => {
+    propertiesArray.forEach((prop: { 
+      name?: string; 
+      value?: any; 
+      last_value?: any;
+      id?: string;
+      type?: string;
+      updated_at?: string;
+      variable_name?: string;
+      permission?: string;
+      update_parameter?: number;
+      update_strategy?: string;
+      thing_id?: string;
+      thing_name?: string;
+      device_id?: string;
+      channel?: { id: string; name: string; }
+    }) => {
       if (prop && typeof prop === 'object' && !Array.isArray(prop) && typeof prop.name === 'string') {
         // Extract the last value from the property
         const lastValue = prop.last_value !== undefined ? prop.last_value : prop.value;
