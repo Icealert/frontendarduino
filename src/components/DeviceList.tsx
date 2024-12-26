@@ -61,7 +61,12 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
           return false;
         }
 
-        const nameMatch = p.name === propertyName || p.variable_name === propertyName;
+        // Check both name and variable_name, case-insensitive
+        const propName = (p.name || '').toLowerCase();
+        const varName = (p.variable_name || '').toLowerCase();
+        const searchName = propertyName.toLowerCase();
+        
+        const nameMatch = propName === searchName || varName === searchName;
         if (nameMatch) {
           console.log('Found matching property:', JSON.stringify(p, null, 2));
         }
@@ -74,7 +79,9 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
       }
 
       // Get value with validation
-      const value = property.last_value ?? property.value;
+      const value = property.value ?? property.last_value;
+      console.log(`Raw value for ${propertyName}:`, value);
+
       if (value === undefined || value === null) {
         console.log(`No value found for property: ${propertyName}`);
         return 'No data';
@@ -94,7 +101,11 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
   // Get last update time with validation
   let lastUpdate: string | null = null;
   try {
-    const validProperties = properties.filter(p => p && typeof p === 'object' && p.updated_at);
+    // Sort properties by update time to get the most recent
+    const validProperties = properties
+      .filter(p => p && typeof p === 'object' && p.updated_at)
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    
     const lastProperty = validProperties[0];
     
     if (lastProperty?.updated_at) {
@@ -191,17 +202,35 @@ export default function DeviceList({ devices, selectedDevice, onDeviceSelect }: 
                 <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                   <div className="text-2xl mb-1">💧</div>
                   <div className="text-sm font-medium text-slate-300">Flow Rate</div>
-                  <div className="text-slate-400 mt-1">{metrics.flowrate}</div>
+                  <div className="text-slate-400 mt-1">
+                    {metrics.flowrate !== 'No data' ? (
+                      <>{metrics.flowrate} L/min</>
+                    ) : (
+                      'No data'
+                    )}
+                  </div>
                 </div>
                 <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                   <div className="text-2xl mb-1">💨</div>
                   <div className="text-sm font-medium text-slate-300">Humidity</div>
-                  <div className="text-slate-400 mt-1">{metrics.humidity}</div>
+                  <div className="text-slate-400 mt-1">
+                    {metrics.humidity !== 'No data' ? (
+                      <>{metrics.humidity}%</>
+                    ) : (
+                      'No data'
+                    )}
+                  </div>
                 </div>
                 <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                   <div className="text-2xl mb-1">🌡️</div>
                   <div className="text-sm font-medium text-slate-300">Temperature</div>
-                  <div className="text-slate-400 mt-1">{metrics.temperature}</div>
+                  <div className="text-slate-400 mt-1">
+                    {metrics.temperature !== 'No data' ? (
+                      <>{metrics.temperature}°C</>
+                    ) : (
+                      'No data'
+                    )}
+                  </div>
                 </div>
               </div>
 
