@@ -216,7 +216,7 @@ export function groupProperties(rawProperties: any): { group: string; properties
       return {
         id: existingProp?.id || `generated_${propName}`,
         name: propName,
-        type: existingProp?.type || PropertyTypes[propName as PropertyName] || 'String',
+        type: existingProp?.type || PropertyTypes[propName as PropertyName] || 'CHARSTRING',
         value: existingProp?.value ?? DefaultValues[propName as PropertyName],
         last_value: existingProp?.last_value ?? null,
         updated_at: existingProp?.updated_at || null,
