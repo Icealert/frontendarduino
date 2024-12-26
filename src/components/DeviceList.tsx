@@ -17,15 +17,25 @@ interface DeviceMetrics {
 }
 
 function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
-  // Ensure properties exists
-  const properties = device.properties || [];
+  // Convert properties to array if it's not already
+  const properties = Array.isArray(device.properties) 
+    ? device.properties 
+    : Object.values(device.properties || {});
   
   // Safe property lookup function that matches Arduino IoT Cloud API format
   const findPropertyValue = (propertyName: PropertyName): string => {
     try {
+      // Ensure we're working with an array
+      if (!Array.isArray(properties)) {
+        console.warn('Properties is not an array:', properties);
+        return 'No data';
+      }
+
       // Find property with matching name or variable_name
       const property = properties.find(p => 
-        p && typeof p === 'object' && (
+        p && 
+        typeof p === 'object' && 
+        (
           (p.name && p.name === propertyName) || 
           (p.variable_name && p.variable_name === propertyName)
         )
@@ -49,7 +59,9 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
   // Get last update time safely
   let lastUpdate: string | null = null;
   try {
-    const lastUpdateProp = properties[0]?.updated_at || properties[0]?.last_update_at;
+    // Convert to array if needed for timestamp lookup
+    const propsArray = Array.isArray(properties) ? properties : Object.values(properties || {});
+    const lastUpdateProp = propsArray[0]?.updated_at || propsArray[0]?.last_update_at;
     if (lastUpdateProp) {
       lastUpdate = new Date(lastUpdateProp).toLocaleString();
     }
@@ -57,6 +69,7 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
     console.error('Error getting last update time:', error);
   }
 
+  // Return metrics with safe property lookups
   return {
     flowrate: findPropertyValue('cloudflowrate'),
     humidity: findPropertyValue('cloudhumidity'),

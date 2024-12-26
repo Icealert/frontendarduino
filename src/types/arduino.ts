@@ -141,9 +141,14 @@ export function getPropertyGroup(name: PropertyName): string {
   return 'Configuration';
 }
 
-export function groupProperties(properties: ArduinoProperty[]): { group: string; properties: ArduinoProperty[] }[] {
-  if (!Array.isArray(properties)) {
-    console.warn('Properties is not an array:', properties);
+export function groupProperties(properties: any): { group: string; properties: ArduinoProperty[] }[] {
+  // Convert properties to array if it's not already
+  const propsArray = Array.isArray(properties) 
+    ? properties 
+    : Object.values(properties || {});
+
+  if (!Array.isArray(propsArray)) {
+    console.warn('Properties could not be converted to array:', properties);
     return [];
   }
 
@@ -156,7 +161,7 @@ export function groupProperties(properties: ArduinoProperty[]): { group: string;
   ]);
 
   // Safely process each property
-  properties.forEach(prop => {
+  propsArray.forEach(prop => {
     if (!prop || typeof prop !== 'object' || !prop.name) {
       console.warn('Invalid property:', prop);
       return;
