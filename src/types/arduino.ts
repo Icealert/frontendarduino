@@ -146,99 +146,88 @@ export function groupProperties(rawProperties: any): { group: string; properties
   // Log raw input
   console.log('Raw properties input:', JSON.stringify(rawProperties, null, 2));
 
-  // Safely convert to array and filter out non-object values
-  let properties: any[] = [];
+  // Get all expected properties with default values
+  const expectedProperties = Object.keys(DefaultValues);
+  
+  // Convert raw properties to a map for easier lookup
+  const propertyMap = new Map<string, any>();
+  
   try {
+    // Process raw properties into a map
     if (Array.isArray(rawProperties)) {
-      properties = rawProperties.filter(prop => {
-        const propertyObj = prop as { name?: unknown };
-        return (
-          prop &&
-          typeof prop === 'object' &&
-          !Array.isArray(prop) &&
-          typeof propertyObj.name === 'string' &&
-          propertyObj.name.trim() !== ''
-        );
-      });
-    } else if (typeof rawProperties === 'object' && rawProperties !== null) {
-      properties = Object.values(rawProperties).filter(prop => {
-        const propertyObj = prop as { name?: unknown };
-        return (
-          prop &&
-          typeof prop === 'object' &&
-          !Array.isArray(prop) &&
-          typeof propertyObj.name === 'string' &&
-          propertyObj.name.trim() !== ''
-        );
+      rawProperties.forEach(prop => {
+        if (prop && typeof prop === 'object' && !Array.isArray(prop) && typeof prop.name === 'string') {
+          propertyMap.set(prop.name, prop);
+        }
       });
     }
+
+    // Create processed properties array with defaults for missing values
+    const properties = expectedProperties.map(propName => {
+      const existingProp = propertyMap.get(propName);
+      
+      return {
+        id: existingProp?.id || `generated_${propName}`,
+        name: propName,
+        type: existingProp?.type || PropertyTypes[propName as PropertyName] || 'String',
+        value: existingProp?.value ?? null,
+        last_value: existingProp?.last_value ?? null,
+        updated_at: existingProp?.updated_at || null,
+        variable_name: existingProp?.variable_name || propName,
+        permission: existingProp?.permission || 'READ_WRITE',
+        update_parameter: existingProp?.update_parameter ?? 0,
+        update_strategy: existingProp?.update_strategy || 'ON_CHANGE',
+        thing_id: existingProp?.thing_id || null,
+        thing_name: existingProp?.thing_name || null,
+        device_id: existingProp?.device_id || null,
+        channel: existingProp?.channel || null
+      } as ArduinoProperty;
+    });
+
+    // Initialize groups
+    const groupMap = new Map<string, ArduinoProperty[]>([
+      ['Measurements', []],
+      ['Thresholds', []],
+      ['Timing', []],
+      ['Configuration', []]
+    ]);
+
+    // Group properties
+    properties.forEach(prop => {
+      try {
+        let group = 'Configuration';
+        const name = prop.name.toLowerCase();
+
+        if (name.startsWith('cloud')) {
+          group = 'Measurements';
+        } else if (name.includes('threshold')) {
+          group = 'Thresholds';
+        } else if (name.includes('time')) {
+          group = 'Timing';
+        }
+
+        groupMap.get(group)!.push(prop);
+      } catch (error) {
+        console.error('Error grouping property:', error, prop);
+      }
+    });
+
+    // Build result array with sorted properties
+    const result = Array.from(groupMap.entries())
+      .filter(([_, props]) => props.length > 0)
+      .map(([group, props]) => ({
+        group,
+        properties: props.sort((a, b) => a.name.localeCompare(b.name))
+      }));
+
+    // Log final result
+    console.log('Grouped properties:', JSON.stringify(result, null, 2));
+    return result;
+
   } catch (error) {
     console.error('Error processing properties:', error);
     return [];
   }
-
-  // Log filtered array
-  console.log('Filtered properties array:', JSON.stringify(properties, null, 2));
-
-  // Initialize groups
-  const groupMap = new Map<string, ArduinoProperty[]>([
-    ['Measurements', []],
-    ['Thresholds', []],
-    ['Timing', []],
-    ['Configuration', []]
-  ]);
-
-  // Process each property
-  properties.forEach((prop) => {
-    try {
-      // Determine group
-      let group = 'Configuration';
-      const name = prop.name.toLowerCase();
-
-      if (name.startsWith('cloud')) {
-        group = 'Measurements';
-      } else if (name.includes('threshold')) {
-        group = 'Thresholds';
-      } else if (name.includes('time')) {
-        group = 'Timing';
-      }
-
-      // Clean property object before adding
-      const cleanProperty: ArduinoProperty = {
-        id: prop.id || `generated_${prop.name}`,
-        name: prop.name,
-        type: prop.type || 'String',
-        value: prop.value ?? null,
-        last_value: prop.last_value,
-        updated_at: prop.updated_at,
-        variable_name: prop.variable_name,
-        permission: prop.permission,
-        update_parameter: prop.update_parameter,
-        update_strategy: prop.update_strategy,
-        thing_id: prop.thing_id,
-        thing_name: prop.thing_name,
-        device_id: prop.device_id,
-        channel: prop.channel
-      };
-
-      groupMap.get(group)!.push(cleanProperty);
-
-    } catch (error) {
-      console.error('Error processing property:', error, prop);
-    }
-  });
-
-  // Build result array, only including groups with properties
-  const result = Array.from(groupMap.entries())
-    .filter(([_, props]) => props.length > 0)
-    .map(([group, props]) => ({
-      group,
-      properties: props.sort((a, b) => a.name.localeCompare(b.name))
-    }));
-
-  // Log final result
-  console.log('Grouped properties:', JSON.stringify(result, null, 2));
-  return result;
 }
 
 export function validateValue(name: PropertyName, value: any): boolean {
