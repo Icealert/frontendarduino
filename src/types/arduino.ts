@@ -5,10 +5,17 @@ export interface ArduinoDevice {
   serial?: string;
   fqbn?: string;
   events?: any[];
-  properties?: ArduinoProperty[];
+  properties: any[];
   device_status: 'ONLINE' | 'OFFLINE';
   connection_type?: string;
   online?: boolean;
+  user_id?: string;
+  data_retention_days?: number;
+  deviceId?: string;
+  prototype?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface ArduinoProperty {

@@ -17,25 +17,25 @@ interface DeviceMetrics {
 }
 
 function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
-  // Ensure properties is an array and has items
-  const properties = Array.isArray(device.properties) ? device.properties : [];
+  // Ensure properties exists
+  const properties = device.properties || [];
   
   // Safe property lookup function that matches Arduino IoT Cloud API format
   const findPropertyValue = (propertyName: PropertyName): string => {
     try {
-      // Find property with matching variable_name (Arduino IoT Cloud uses variable_name)
-      const property = properties.find((p: ArduinoProperty) => 
-        p && 
-        typeof p === 'object' && 
-        (p.name === propertyName || p.variable_name === propertyName)
+      // Find property with matching name or variable_name
+      const property = properties.find(p => 
+        p && typeof p === 'object' && (
+          (p.name && p.name === propertyName) || 
+          (p.variable_name && p.variable_name === propertyName)
+        )
       );
       
-      // Check if property exists and has last_value (Arduino IoT Cloud API format)
+      // Check if property exists and has a value
       if (property) {
-        // Handle both direct value and last_value formats
-        const propertyValue = 'last_value' in property ? property.last_value : property.value;
-        if (propertyValue !== undefined && propertyValue !== null) {
-          return formatValue(propertyName, propertyValue);
+        const value = property.last_value ?? property.value;
+        if (value !== undefined && value !== null) {
+          return formatValue(propertyName, value);
         }
       }
       
@@ -46,10 +46,9 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
     }
   };
 
-  // Get last update time safely using Arduino IoT Cloud timestamp format
+  // Get last update time safely
   let lastUpdate: string | null = null;
   try {
-    // Try both updated_at and last_update_at fields
     const lastUpdateProp = properties[0]?.updated_at || properties[0]?.last_update_at;
     if (lastUpdateProp) {
       lastUpdate = new Date(lastUpdateProp).toLocaleString();
@@ -204,14 +203,15 @@ export default function DeviceList({ devices, selectedDevice, onDeviceSelect }: 
                         {group}
                       </h4>
                       <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
-                        {properties.map((property: ArduinoProperty) => {
+                        {properties.map((property: any) => {
                           // Skip invalid properties
                           if (!property || !property.name) return null;
 
                           // Get the display value safely
-                          const displayValue = property.last_value !== undefined 
-                            ? formatValue(property.name as any, property.last_value)
-                            : formatValue(property.name as any, property.value);
+                          const value = property.last_value ?? property.value;
+                          const displayValue = value !== undefined && value !== null
+                            ? formatValue(property.name as any, value)
+                            : 'No data';
 
                           return (
                             <div key={property.id} className="flex items-center justify-between">
@@ -238,6 +238,18 @@ export default function DeviceList({ devices, selectedDevice, onDeviceSelect }: 
                         <div className="flex items-center justify-between">
                           <span className="text-slate-300">Connection</span>
                           <span className="text-slate-400">{device.connection_type}</span>
+                        </div>
+                      )}
+                      {device.data_retention_days && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-300">Data Retention</span>
+                          <span className="text-slate-400">{device.data_retention_days} days</span>
+                        </div>
+                      )}
+                      {device.prototype && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-300">Prototype</span>
+                          <span className="text-slate-400">{device.prototype.name}</span>
                         </div>
                       )}
                     </div>
