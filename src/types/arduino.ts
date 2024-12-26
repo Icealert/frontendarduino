@@ -150,21 +150,27 @@ export function groupProperties(rawProperties: any): { group: string; properties
   let properties: any[] = [];
   try {
     if (Array.isArray(rawProperties)) {
-      properties = rawProperties.filter(prop => 
-        prop && 
-        typeof prop === 'object' && 
-        !Array.isArray(prop) &&
-        typeof prop.name === 'string' &&
-        prop.name.trim() !== ''
-      );
+      properties = rawProperties.filter(prop => {
+        const propertyObj = prop as { name?: unknown };
+        return (
+          prop &&
+          typeof prop === 'object' &&
+          !Array.isArray(prop) &&
+          typeof propertyObj.name === 'string' &&
+          propertyObj.name.trim() !== ''
+        );
+      });
     } else if (typeof rawProperties === 'object' && rawProperties !== null) {
-      properties = Object.values(rawProperties).filter(prop => 
-        prop && 
-        typeof prop === 'object' && 
-        !Array.isArray(prop) &&
-        typeof prop.name === 'string' &&
-        prop.name.trim() !== ''
-      );
+      properties = Object.values(rawProperties).filter(prop => {
+        const propertyObj = prop as { name?: unknown };
+        return (
+          prop &&
+          typeof prop === 'object' &&
+          !Array.isArray(prop) &&
+          typeof propertyObj.name === 'string' &&
+          propertyObj.name.trim() !== ''
+        );
+      });
     }
   } catch (error) {
     console.error('Error processing properties:', error);
