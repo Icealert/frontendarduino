@@ -204,14 +204,22 @@ export default function DeviceList({ devices, selectedDevice, onDeviceSelect }: 
                         {group}
                       </h4>
                       <div className="bg-slate-700/30 rounded-lg p-3 space-y-3">
-                        {properties.map((property: ArduinoProperty) => (
-                          <div key={property.id} className="flex items-center justify-between">
-                            <span className="text-slate-300">{property.name}</span>
-                            <span className="text-slate-400">
-                              {formatValue(property.name as any, property.value)}
-                            </span>
-                          </div>
-                        ))}
+                        {properties.map((property: ArduinoProperty) => {
+                          // Skip invalid properties
+                          if (!property || !property.name) return null;
+
+                          // Get the display value safely
+                          const displayValue = property.last_value !== undefined 
+                            ? formatValue(property.name as any, property.last_value)
+                            : formatValue(property.name as any, property.value);
+
+                          return (
+                            <div key={property.id} className="flex items-center justify-between">
+                              <span className="text-slate-300">{property.name}</span>
+                              <span className="text-slate-400">{displayValue}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
