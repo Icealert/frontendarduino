@@ -17,16 +17,39 @@ interface DeviceMetrics {
 }
 
 function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
-  const properties = device.properties || [];
+  // Ensure properties is an array and has items
+  const properties = Array.isArray(device.properties) ? device.properties : [];
   
+  // Safe property lookup function
   const findPropertyValue = (propertyName: PropertyName): string => {
-    const property = properties.find(p => p.name === propertyName);
-    if (!property) return 'No data';
-    return formatValue(propertyName, property.value);
+    try {
+      // Find property with matching name
+      const property = properties.find((p: ArduinoProperty) => 
+        p && typeof p === 'object' && 'name' in p && p.name === propertyName
+      );
+      
+      // If property exists and has a value, format it
+      if (property && 'value' in property) {
+        return formatValue(propertyName, property.value);
+      }
+      
+      return 'No data';
+    } catch (error) {
+      console.error(`Error getting value for ${propertyName}:`, error);
+      return 'No data';
+    }
   };
 
-  const lastUpdateProp = properties[0]?.updated_at;
-  const lastUpdate = lastUpdateProp ? new Date(lastUpdateProp).toLocaleString() : null;
+  // Get last update time safely
+  let lastUpdate: string | null = null;
+  try {
+    const lastUpdateProp = properties[0]?.updated_at;
+    if (lastUpdateProp) {
+      lastUpdate = new Date(lastUpdateProp).toLocaleString();
+    }
+  } catch (error) {
+    console.error('Error getting last update time:', error);
+  }
 
   return {
     flowrate: findPropertyValue('cloudflowrate'),
