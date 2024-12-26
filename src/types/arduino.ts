@@ -15,10 +15,21 @@ export interface ArduinoProperty {
   id: string;
   name: string;
   type: 'String' | 'Float' | 'Integer';
-  value: any;
-  updated_at: string;
+  value?: any;
+  last_value?: any;
+  updated_at?: string;
+  last_update_at?: string;
   variable_name?: string;
   permission?: string;
+  update_parameter?: number;
+  update_strategy?: string;
+  thing_id?: string;
+  thing_name?: string;
+  device_id?: string;
+  channel?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface DeviceSettings {

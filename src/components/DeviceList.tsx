@@ -20,17 +20,23 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
   // Ensure properties is an array and has items
   const properties = Array.isArray(device.properties) ? device.properties : [];
   
-  // Safe property lookup function
+  // Safe property lookup function that matches Arduino IoT Cloud API format
   const findPropertyValue = (propertyName: PropertyName): string => {
     try {
-      // Find property with matching name
+      // Find property with matching variable_name (Arduino IoT Cloud uses variable_name)
       const property = properties.find((p: ArduinoProperty) => 
-        p && typeof p === 'object' && 'name' in p && p.name === propertyName
+        p && 
+        typeof p === 'object' && 
+        (p.name === propertyName || p.variable_name === propertyName)
       );
       
-      // If property exists and has a value, format it
-      if (property && 'value' in property) {
-        return formatValue(propertyName, property.value);
+      // Check if property exists and has last_value (Arduino IoT Cloud API format)
+      if (property) {
+        // Handle both direct value and last_value formats
+        const propertyValue = 'last_value' in property ? property.last_value : property.value;
+        if (propertyValue !== undefined && propertyValue !== null) {
+          return formatValue(propertyName, propertyValue);
+        }
       }
       
       return 'No data';
@@ -40,10 +46,11 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
     }
   };
 
-  // Get last update time safely
+  // Get last update time safely using Arduino IoT Cloud timestamp format
   let lastUpdate: string | null = null;
   try {
-    const lastUpdateProp = properties[0]?.updated_at;
+    // Try both updated_at and last_update_at fields
+    const lastUpdateProp = properties[0]?.updated_at || properties[0]?.last_update_at;
     if (lastUpdateProp) {
       lastUpdate = new Date(lastUpdateProp).toLocaleString();
     }
