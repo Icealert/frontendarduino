@@ -12,23 +12,25 @@ export async function createArduinoApiClient(): Promise<ArduinoApiClient> {
   const client: ArduinoApiClient = {
     async getDevices() {
       const response = await fetch('/api/arduino');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch devices: ${response.statusText}`);
+      }
       const data = await response.json();
-      
       if (data.error) {
         throw new Error(data.error);
       }
-      
       return data.devices || [];
     },
 
     async getDeviceProperties(deviceId: string) {
       const response = await fetch(`/api/arduino?deviceId=${deviceId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch properties for device ${deviceId}: ${response.statusText}`);
+      }
       const data = await response.json();
-      
       if (data.error) {
         throw new Error(data.error);
       }
-      
       return data.devices?.[0]?.properties || [];
     },
 
@@ -41,51 +43,51 @@ export async function createArduinoApiClient(): Promise<ArduinoApiClient> {
         body: JSON.stringify({
           deviceId,
           propertyId,
-          value
+          value,
         }),
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to update property: ${response.statusText}`);
+      }
+
       const data = await response.json();
-      
       if (data.error) {
         throw new Error(data.error);
       }
     },
 
     async getDeviceSettings(deviceId: string) {
-      const properties = await this.getDeviceProperties(deviceId);
-      const settings: Partial<DeviceSettings> = {};
-
-      // First, set all properties to their default values
-      (Object.keys(DefaultValues) as Array<keyof DeviceSettings>).forEach(key => {
-        settings[key] = DefaultValues[key];
-      });
-
-      // Then override with actual values from the device
-      properties.forEach((prop: ArduinoProperty) => {
-        const name = prop.name as keyof DeviceSettings;
-        if (name && name in DefaultValues) {
-          settings[name] = prop.value;
-        }
-      });
-
-      return settings as DeviceSettings;
+      const response = await fetch(`/api/arduino/settings?deviceId=${deviceId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch settings for device ${deviceId}: ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      return data.settings || {};
     },
 
     async updateDeviceSettings(deviceId: string, settings: Partial<DeviceSettings>) {
-      const properties = await this.getDeviceProperties(deviceId);
-      const updates: Promise<void>[] = [];
-
-      Object.entries(settings).forEach(([name, value]) => {
-        const property = properties.find((p: ArduinoProperty) => p.name === name);
-        if (property && validateValue(name as any, value)) {
-          updates.push(this.updateProperty(deviceId, property.id, value));
-        }
+      const response = await fetch(`/api/arduino/settings/update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ deviceId, settings }),
       });
 
-      await Promise.all(updates);
-    }
+      if (!response.ok) {
+        throw new Error(`Failed to update settings: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+    },
   };
 
   return client;
-} 
+}
