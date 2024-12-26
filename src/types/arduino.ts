@@ -284,19 +284,27 @@ export function validateValue(name: PropertyName, value: any): boolean {
   const type = PropertyTypes[name];
   
   switch (type) {
-    case 'String':
+    case 'CHARSTRING':
       if (name === 'alertEmail') {
         return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
       }
       return typeof value === 'string';
       
-    case 'Float':
+    case 'FLOAT':
       const numValue = parseFloat(value);
       return !isNaN(numValue) && isFinite(numValue);
       
-    case 'Integer':
+    case 'INT':
       const intValue = parseInt(value, 10);
       return !isNaN(intValue) && Number.isInteger(intValue) && intValue >= 0;
+      
+    case 'TEMPERATURE':
+      const tempValue = parseFloat(value);
+      return !isNaN(tempValue) && isFinite(tempValue);
+      
+    case 'PERCENTAGE_RELATIVE_HUMIDITY':
+      const humidityValue = parseFloat(value);
+      return !isNaN(humidityValue) && isFinite(humidityValue) && humidityValue >= 0 && humidityValue <= 100;
       
     default:
       return true;
