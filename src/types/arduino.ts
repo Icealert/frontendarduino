@@ -121,17 +121,46 @@ export function getDefaultValue(propertyName: PropertyName): any {
 
 // Helper functions
 export function formatValue(name: PropertyName, value: any): string {
-  if (value === null || value === undefined || value === '') return 'N/A';
+  // For null/undefined/empty values, return N/A
+  if (value === null || value === undefined || value === '') {
+    return 'N/A';
+  }
 
+  // Handle different property types
   switch (name) {
     case 'lastUpdateTime':
-      return value ? new Date(value).toLocaleString() : 'N/A';
+      try {
+        return new Date(value).toLocaleString();
+      } catch {
+        return 'N/A';
+      }
+    
     case 'alertEmail':
-      return value || 'N/A';
-    default:
+      return String(value);
+
+    // Handle numeric values
+    case 'cloudflowrate':
+    case 'cloudhumidity':
+    case 'cloudtemp':
+    case 'flowThresholdMin':
+    case 'humidityThresholdMax':
+    case 'humidityThresholdMin':
+    case 'tempThresholdMax':
+    case 'tempThresholdMin':
+      const num = Number(value);
+      if (isNaN(num)) return 'N/A';
       const unit = PropertyUnits[name];
-      if (typeof value === 'number' && isNaN(value)) return 'N/A';
-      return unit ? `${value}${unit}` : String(value);
+      return unit ? `${num}${unit}` : String(num);
+
+    // Handle integer values
+    case 'noFlowCriticalTime':
+    case 'noFlowWarningTime':
+      const int = parseInt(value, 10);
+      if (isNaN(int)) return 'N/A';
+      return `${int}${PropertyUnits[name] || ''}`;
+
+    default:
+      return String(value);
   }
 }
 
@@ -153,14 +182,24 @@ export function groupProperties(rawProperties: any): { group: string; properties
   const propertyMap = new Map<string, any>();
   
   try {
+    // Handle if rawProperties is wrapped in a data structure
+    const propertiesArray = Array.isArray(rawProperties) 
+      ? rawProperties 
+      : (rawProperties?.properties || []);
+
     // Process raw properties into a map
-    if (Array.isArray(rawProperties)) {
-      rawProperties.forEach(prop => {
-        if (prop && typeof prop === 'object' && !Array.isArray(prop) && typeof prop.name === 'string') {
-          propertyMap.set(prop.name, prop);
-        }
-      });
-    }
+    propertiesArray.forEach(prop => {
+      if (prop && typeof prop === 'object' && !Array.isArray(prop) && typeof prop.name === 'string') {
+        // Extract the last value from the property
+        const lastValue = prop.last_value !== undefined ? prop.last_value : prop.value;
+        
+        // Store the property with its value
+        propertyMap.set(prop.name, {
+          ...prop,
+          value: lastValue
+        });
+      }
+    });
 
     // Create processed properties array with defaults for missing values
     const properties = expectedProperties.map(propName => {
@@ -170,7 +209,7 @@ export function groupProperties(rawProperties: any): { group: string; properties
         id: existingProp?.id || `generated_${propName}`,
         name: propName,
         type: existingProp?.type || PropertyTypes[propName as PropertyName] || 'String',
-        value: existingProp?.value ?? null,
+        value: existingProp?.value ?? DefaultValues[propName as PropertyName],
         last_value: existingProp?.last_value ?? null,
         updated_at: existingProp?.updated_at || null,
         variable_name: existingProp?.variable_name || propName,
@@ -206,7 +245,10 @@ export function groupProperties(rawProperties: any): { group: string; properties
           group = 'Timing';
         }
 
-        groupMap.get(group)!.push(prop);
+        // Only add properties that have actual values
+        if (prop.value !== null && prop.value !== undefined) {
+          groupMap.get(group)!.push(prop);
+        }
       } catch (error) {
         console.error('Error grouping property:', error, prop);
       }
