@@ -121,15 +121,16 @@ export function getDefaultValue(propertyName: PropertyName): any {
 
 // Helper functions
 export function formatValue(name: PropertyName, value: any): string {
-  if (value === null || value === undefined) return 'Not set';
+  if (value === null || value === undefined || value === '') return 'N/A';
 
   switch (name) {
     case 'lastUpdateTime':
-      return new Date(value).toLocaleString();
+      return value ? new Date(value).toLocaleString() : 'N/A';
     case 'alertEmail':
-      return value || 'Not set';
+      return value || 'N/A';
     default:
       const unit = PropertyUnits[name];
+      if (typeof value === 'number' && isNaN(value)) return 'N/A';
       return unit ? `${value}${unit}` : String(value);
   }
 }
@@ -141,18 +142,33 @@ export function getPropertyGroup(name: PropertyName): string {
   return 'Configuration';
 }
 
-export function groupProperties(properties: any): { group: string; properties: ArduinoProperty[] }[] {
-  // Convert properties to array if it's not already
-  const propsArray = Array.isArray(properties) 
-    ? properties 
-    : Object.values(properties || {});
+export function groupProperties(rawProperties: any): { group: string; properties: ArduinoProperty[] }[] {
+  // Log raw input
+  console.log('Raw properties input:', JSON.stringify(rawProperties, null, 2));
 
-  if (!Array.isArray(propsArray)) {
-    console.warn('Properties could not be converted to array:', properties);
+  // Safely convert to array
+  let properties: any[] = [];
+  try {
+    if (Array.isArray(rawProperties)) {
+      properties = rawProperties;
+    } else if (typeof rawProperties === 'object' && rawProperties !== null) {
+      properties = Object.values(rawProperties);
+    }
+  } catch (error) {
+    console.error('Error converting properties to array:', error);
     return [];
   }
 
-  // Initialize groups with predefined categories
+  // Log converted array
+  console.log('Properties array:', JSON.stringify(properties, null, 2));
+
+  // Validate properties array
+  if (!Array.isArray(properties)) {
+    console.warn('Properties could not be converted to array:', rawProperties);
+    return [];
+  }
+
+  // Initialize groups
   const groupMap = new Map<string, ArduinoProperty[]>([
     ['Measurements', []],
     ['Thresholds', []],
@@ -160,40 +176,68 @@ export function groupProperties(properties: any): { group: string; properties: A
     ['Configuration', []]
   ]);
 
-  // Safely process each property
-  propsArray.forEach(prop => {
-    if (!prop || typeof prop !== 'object' || !prop.name) {
-      console.warn('Invalid property:', prop);
-      return;
-    }
-
+  // Process each property with validation
+  properties.forEach((prop, index) => {
     try {
-      let group = 'Configuration'; // Default group
+      // Validate property object
+      if (!prop || typeof prop !== 'object') {
+        console.warn(`Invalid property at index ${index}:`, prop);
+        return;
+      }
 
-      if (prop.name.startsWith('cloud')) {
+      // Validate required fields
+      if (!prop.name || typeof prop.name !== 'string') {
+        console.warn(`Property at index ${index} missing valid name:`, prop);
+        return;
+      }
+
+      // Determine group
+      let group = 'Configuration';
+      const name = prop.name.toLowerCase();
+
+      if (name.startsWith('cloud')) {
         group = 'Measurements';
-      } else if (prop.name.includes('Threshold')) {
+      } else if (name.includes('threshold')) {
         group = 'Thresholds';
-      } else if (prop.name.includes('Time')) {
+      } else if (name.includes('time')) {
         group = 'Timing';
       }
 
+      // Add to group
       if (!groupMap.has(group)) {
         groupMap.set(group, []);
       }
-      groupMap.get(group)!.push(prop);
+
+      // Clean property object before adding
+      const cleanProperty: ArduinoProperty = {
+        id: prop.id || `generated_${index}`,
+        name: prop.name,
+        type: prop.type || 'String',
+        value: prop.value,
+        last_value: prop.last_value,
+        updated_at: prop.updated_at,
+        variable_name: prop.variable_name
+      };
+
+      groupMap.get(group)!.push(cleanProperty);
+      console.log(`Added property to ${group}:`, JSON.stringify(cleanProperty, null, 2));
+
     } catch (error) {
-      console.error('Error processing property:', prop, error);
+      console.error(`Error processing property at index ${index}:`, error, prop);
     }
   });
 
-  // Convert map to array and filter out empty groups
-  return Array.from(groupMap.entries())
+  // Build result array
+  const result = Array.from(groupMap.entries())
     .filter(([_, props]) => props.length > 0)
     .map(([group, props]) => ({
       group,
       properties: props
     }));
+
+  // Log final result
+  console.log('Grouped properties:', JSON.stringify(result, null, 2));
+  return result;
 }
 
 export function validateValue(name: PropertyName, value: any): boolean {
