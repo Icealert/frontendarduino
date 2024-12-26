@@ -35,10 +35,29 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
   let properties: any[] = [];
   try {
     if (device.properties) {
-      if (Array.isArray(device.properties)) {
-        properties = device.properties;
-      } else if (typeof device.properties === 'object') {
-        properties = Object.values(device.properties);
+      // Filter out non-object values and ensure we have valid property objects
+      properties = (Array.isArray(device.properties) ? device.properties : [])
+        .filter(p => 
+          p && 
+          typeof p === 'object' && 
+          !Array.isArray(p) && 
+          typeof p.name === 'string' &&
+          p.name.trim() !== ''
+        );
+
+      // If properties is nested inside a data structure, handle that case
+      if (properties.length === 0 && typeof device.properties === 'object') {
+        const propsObj = device.properties as { properties?: any[]; data?: any[] };
+        const nestedProps = propsObj.properties || propsObj.data;
+        if (Array.isArray(nestedProps)) {
+          properties = nestedProps.filter(p => 
+            p && 
+            typeof p === 'object' && 
+            !Array.isArray(p) && 
+            typeof p.name === 'string' &&
+            p.name.trim() !== ''
+          );
+        }
       }
     }
   } catch (error) {
@@ -46,7 +65,7 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
   }
 
   // Log extracted properties
-  console.log('Extracted properties:', JSON.stringify(properties, null, 2));
+  console.log('Extracted valid properties:', JSON.stringify(properties, null, 2));
   
   // Safe property lookup function
   const findPropertyValue = (propertyName: PropertyName): string => {
@@ -56,11 +75,6 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
 
       // Find property with matching name, with validation
       const property = properties.find(p => {
-        if (!p || typeof p !== 'object') {
-          console.warn('Invalid property object:', p);
-          return false;
-        }
-
         // Check both name and variable_name, case-insensitive
         const propName = (p.name || '').toLowerCase();
         const varName = (p.variable_name || '').toLowerCase();
@@ -103,13 +117,18 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
   try {
     // Sort properties by update time to get the most recent
     const validProperties = properties
-      .filter(p => p && typeof p === 'object' && p.updated_at)
-      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      .filter(p => p.updated_at || p.last_update_at)
+      .sort((a, b) => {
+        const dateA = new Date(a.updated_at || a.last_update_at).getTime();
+        const dateB = new Date(b.updated_at || b.last_update_at).getTime();
+        return dateB - dateA;
+      });
     
     const lastProperty = validProperties[0];
+    const updateTime = lastProperty?.updated_at || lastProperty?.last_update_at;
     
-    if (lastProperty?.updated_at) {
-      lastUpdate = new Date(lastProperty.updated_at).toLocaleString();
+    if (updateTime) {
+      lastUpdate = new Date(updateTime).toLocaleString();
       console.log('Last update time:', lastUpdate);
     } else {
       console.log('No valid update time found');
