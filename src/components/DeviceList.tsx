@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArduinoDevice, ArduinoProperty, formatValue, groupProperties } from '../types/arduino';
+import { ArduinoDevice, ArduinoProperty, formatValue, groupProperties, PropertyName } from '../types/arduino';
 
 interface DeviceListProps {
   devices: ArduinoDevice[];
@@ -17,19 +17,21 @@ interface DeviceMetrics {
 }
 
 function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
-  const props = device.properties || [];
-  const getPropertyValue = (name: string) => {
-    const prop = props.find(p => p.name === name);
-    return prop ? formatValue(name as any, prop.value) : 'No data';
+  const properties = device.properties || [];
+  
+  const findPropertyValue = (propertyName: PropertyName): string => {
+    const property = properties.find(p => p.name === propertyName);
+    if (!property) return 'No data';
+    return formatValue(propertyName, property.value);
   };
 
-  const lastUpdateProp = props[0]?.updated_at;
+  const lastUpdateProp = properties[0]?.updated_at;
   const lastUpdate = lastUpdateProp ? new Date(lastUpdateProp).toLocaleString() : null;
 
   return {
-    flowrate: getPropertyValue('cloudflowrate'),
-    humidity: getPropertyValue('cloudhumidity'),
-    temperature: getPropertyValue('cloudtemp'),
+    flowrate: findPropertyValue('cloudflowrate'),
+    humidity: findPropertyValue('cloudhumidity'),
+    temperature: findPropertyValue('cloudtemp'),
     lastUpdate
   };
 }
