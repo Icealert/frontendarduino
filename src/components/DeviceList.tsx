@@ -32,7 +32,7 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
   console.log('Raw device data:', JSON.stringify(device, null, 2));
 
   // Safely extract properties array
-  let properties: any[] = [];
+  let properties: ArduinoProperty[] = [];
   try {
     if (device.properties) {
       // Filter out non-object values and ensure we have valid property objects
@@ -42,8 +42,9 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
           typeof p === 'object' && 
           !Array.isArray(p) && 
           typeof p.name === 'string' &&
-          p.name.trim() !== ''
-        );
+          p.name.trim() !== '' &&
+          p.type // Ensure property has a type
+        ) as ArduinoProperty[];
 
       // If properties is nested inside a data structure, handle that case
       if (properties.length === 0 && typeof device.properties === 'object') {
@@ -55,8 +56,9 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
             typeof p === 'object' && 
             !Array.isArray(p) && 
             typeof p.name === 'string' &&
-            p.name.trim() !== ''
-          );
+            p.name.trim() !== '' &&
+            p.type // Ensure property has a type
+          ) as ArduinoProperty[];
         }
       }
     }
@@ -101,7 +103,7 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
         return 'No data';
       }
 
-      // Format and return value
+      // Format and return value based on property type
       const formattedValue = formatValue(propertyName, value);
       console.log(`Formatted value for ${propertyName}:`, formattedValue);
       return formattedValue;
@@ -119,8 +121,8 @@ function getDeviceMetrics(device: ArduinoDevice): DeviceMetrics {
     const validProperties = properties
       .filter(p => p.updated_at || p.last_update_at)
       .sort((a, b) => {
-        const dateA = new Date(a.updated_at || a.last_update_at).getTime();
-        const dateB = new Date(b.updated_at || b.last_update_at).getTime();
+        const dateA = new Date(a.updated_at || a.last_update_at || 0).getTime();
+        const dateB = new Date(b.updated_at || b.last_update_at || 0).getTime();
         return dateB - dateA;
       });
     

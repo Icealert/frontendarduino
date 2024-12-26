@@ -21,17 +21,19 @@ export interface ArduinoDevice {
 export interface ArduinoProperty {
   id: string;
   name: string;
-  type: 'String' | 'Float' | 'Integer';
+  type: 'CHARSTRING' | 'FLOAT' | 'INT' | 'PERCENTAGE_RELATIVE_HUMIDITY' | 'TEMPERATURE';
   value?: any;
   last_value?: any;
   updated_at?: string;
   last_update_at?: string;
   variable_name?: string;
-  permission?: string;
+  permission?: 'READ_ONLY' | 'READ_WRITE';
+  persist?: boolean;
   update_parameter?: number;
-  update_strategy?: string;
+  update_strategy?: 'ON_CHANGE' | 'TIMED';
   thing_id?: string;
   thing_name?: string;
+  tag?: number;
   device_id?: string;
   channel?: {
     id: string;
@@ -70,19 +72,19 @@ export type PropertyName =
   | 'tempThresholdMin';
 
 // Property type mapping
-export const PropertyTypes: Record<PropertyName, 'String' | 'Float' | 'Integer'> = {
-  alertEmail: 'String',
-  cloudflowrate: 'Float',
-  cloudhumidity: 'Float',
-  cloudtemp: 'Float',
-  flowThresholdMin: 'Float',
-  humidityThresholdMax: 'Float',
-  humidityThresholdMin: 'Float',
-  lastUpdateTime: 'String',
-  noFlowCriticalTime: 'Integer',
-  noFlowWarningTime: 'Integer',
-  tempThresholdMax: 'Float',
-  tempThresholdMin: 'Float'
+export const PropertyTypes: Record<PropertyName, ArduinoProperty['type']> = {
+  alertEmail: 'CHARSTRING',
+  cloudflowrate: 'FLOAT',
+  cloudhumidity: 'PERCENTAGE_RELATIVE_HUMIDITY',
+  cloudtemp: 'TEMPERATURE',
+  flowThresholdMin: 'FLOAT',
+  humidityThresholdMax: 'FLOAT',
+  humidityThresholdMin: 'FLOAT',
+  lastUpdateTime: 'CHARSTRING',
+  noFlowCriticalTime: 'INT',
+  noFlowWarningTime: 'INT',
+  tempThresholdMax: 'FLOAT',
+  tempThresholdMin: 'FLOAT'
 };
 
 // Property units and formatting
@@ -127,38 +129,29 @@ export function formatValue(name: PropertyName, value: any): string {
   }
 
   // Handle different property types
-  switch (name) {
-    case 'lastUpdateTime':
-      try {
-        return new Date(value).toLocaleString();
-      } catch {
-        return 'N/A';
-      }
-    
-    case 'alertEmail':
-      return String(value);
-
-    // Handle numeric values
-    case 'cloudflowrate':
-    case 'cloudhumidity':
-    case 'cloudtemp':
-    case 'flowThresholdMin':
-    case 'humidityThresholdMax':
-    case 'humidityThresholdMin':
-    case 'tempThresholdMax':
-    case 'tempThresholdMin':
+  switch (PropertyTypes[name]) {
+    case 'TEMPERATURE':
+      const temp = Number(value);
+      return isNaN(temp) ? 'N/A' : `${temp}°C`;
+      
+    case 'PERCENTAGE_RELATIVE_HUMIDITY':
+      const humidity = Number(value);
+      return isNaN(humidity) ? 'N/A' : `${humidity}%`;
+      
+    case 'FLOAT':
       const num = Number(value);
       if (isNaN(num)) return 'N/A';
       const unit = PropertyUnits[name];
       return unit ? `${num}${unit}` : String(num);
-
-    // Handle integer values
-    case 'noFlowCriticalTime':
-    case 'noFlowWarningTime':
+      
+    case 'INT':
       const int = parseInt(value, 10);
       if (isNaN(int)) return 'N/A';
       return `${int}${PropertyUnits[name] || ''}`;
-
+      
+    case 'CHARSTRING':
+      return String(value);
+      
     default:
       return String(value);
   }
