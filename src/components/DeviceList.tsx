@@ -169,9 +169,11 @@ export default function DeviceList({ devices, selectedDevice, onDeviceSelect }: 
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-slate-100">
-                    Device {index + 1}
+                    {device.name}
                   </h3>
-                  <p className="text-sm text-slate-400 mt-1">{device.name}</p>
+                  <p className="text-sm text-slate-400 mt-1">
+                    {device.serial || device.deviceId?.split('-')[0] || 'No ID'}
+                  </p>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className={`px-3 py-1 rounded-full text-xs font-medium ${
