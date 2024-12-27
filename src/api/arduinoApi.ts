@@ -18,7 +18,7 @@ export async function createArduinoApiClient(): Promise<ArduinoApiClient> {
         throw new Error(data.error);
       }
       
-      return data.devices || [];
+      return data || [];
     },
 
     async getDeviceProperties(deviceId: string) {
@@ -29,7 +29,7 @@ export async function createArduinoApiClient(): Promise<ArduinoApiClient> {
         throw new Error(data.error);
       }
       
-      return data.properties || [];
+      return data || [];
     },
 
     async updateProperty(deviceId: string, propertyId: string, value: any) {

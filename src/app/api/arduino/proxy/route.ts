@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'edge';
 
 const ARDUINO_API_BASE = 'https://api2.arduino.cc/iot';
+const TOKEN_ENDPOINT = 'https://api2.arduino.cc/iot/v1/clients/token';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,6 +34,38 @@ export async function OPTIONS() {
   });
 }
 
+async function getAccessToken(): Promise<string> {
+  const clientId = process.env.client_id;
+  const clientSecret = process.env.client_secret;
+
+  if (!clientId || !clientSecret) {
+    throw new Error('Missing credentials: client_id and client_secret are required in environment variables.');
+  }
+
+  const body = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: clientId,
+    client_secret: clientSecret,
+    audience: 'https://api2.arduino.cc/iot'
+  });
+
+  const response = await fetch(TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json'
+    },
+    body: body.toString()
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to get access token');
+  }
+
+  const data = await response.json();
+  return data.access_token;
+}
+
 async function handleRequest(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -45,73 +78,23 @@ async function handleRequest(request: NextRequest) {
       );
     }
 
-    // Determine API version based on endpoint
-    const version = endpoint.startsWith('clients/token') ? 'v1' : 'v2';
-    const url = `${ARDUINO_API_BASE}/${version}/${endpoint}`;
+    // Get access token
+    const accessToken = await getAccessToken();
 
-    console.log('Proxying request:', {
-      method: request.method,
-      url,
-      endpoint,
-      version,
-      hasClientId: !!process.env.client_id,
-      hasClientSecret: !!process.env.client_secret
-    });
+    // Determine API version based on endpoint
+    const version = 'v2';
+    const url = `${ARDUINO_API_BASE}/${version}/${endpoint}`;
 
     // Get the request body if it exists
     let body: string | undefined;
     let requestHeaders: Record<string, string> = {
-      'accept': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${accessToken}`
     };
 
-    // Copy authorization header if present
-    const authHeader = request.headers.get('authorization');
-    if (authHeader) {
-      requestHeaders['authorization'] = authHeader;
-    }
-
     if (request.method !== 'GET') {
-      // For token requests, handle form data
-      if (endpoint === 'clients/token') {
-        requestHeaders['content-type'] = 'application/x-www-form-urlencoded';
-        
-        // Get credentials from environment variables
-        const clientId = process.env.client_id;
-        const clientSecret = process.env.client_secret;
-
-        if (!clientId || !clientSecret) {
-          console.error('Missing credentials:', {
-            hasClientId: !!clientId,
-            hasClientSecret: !!clientSecret,
-            envClientId: !!process.env.client_id,
-            envClientSecret: !!process.env.client_secret
-          });
-          return NextResponse.json(
-            { error: 'Missing credentials: client_id and client_secret are required in environment variables.' },
-            { status: 400, headers: corsHeaders }
-          );
-        }
-        
-        // Create URLSearchParams with explicit string conversion
-        body = new URLSearchParams({
-          grant_type: 'client_credentials',
-          client_id: String(clientId),
-          client_secret: String(clientSecret),
-          audience: 'https://api2.arduino.cc/iot'
-        }).toString();
-
-        console.log('Token request:', {
-          url,
-          hasClientId: !!clientId,
-          hasClientSecret: !!clientSecret,
-          bodyLength: body.length,
-          headers: requestHeaders
-        });
-      } else {
-        // For other requests, use JSON
-        requestHeaders['content-type'] = 'application/json';
-        body = await request.text();
-      }
+      requestHeaders['Content-Type'] = 'application/json';
+      body = await request.text();
     }
 
     // Forward the request to Arduino API
@@ -123,12 +106,6 @@ async function handleRequest(request: NextRequest) {
 
     // Get response as text first
     const responseText = await response.text();
-    console.log('Arduino API response:', {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries()),
-      body: responseText.substring(0, 1000) // Log first 1000 chars to avoid excessive logging
-    });
 
     // Try to parse as JSON
     let responseData;
@@ -143,12 +120,6 @@ async function handleRequest(request: NextRequest) {
     }
 
     if (!response.ok) {
-      console.error('Request failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        data: responseData,
-        endpoint
-      });
       return NextResponse.json(
         { error: responseData.error || 'Request to Arduino IoT Cloud failed' },
         { status: response.status, headers: corsHeaders }
